@@ -9,21 +9,12 @@
 #include <unistd.h>
 #include <ctype.h>
 
-	#define MAXDATASIZE 100 /* max number of bytes we can get at once */
+#define MAXDATASIZE 100 /* max number of bytes we can get at once */
 
-	#define ARRAY_SIZE 150
+#define ARRAY_SIZE 150
 
 #define PORTNUMBER 12345
 
-
-// void Send_Array_Data(int socket_id, int *myArray) {
-// 	int i=0;
-// 	uint16_t statistics;  
-// 	for (i = 0; i < ARRAY_SIZE; i++) {
-// 		statistics = htons(myArray[i]);
-// 		send(socket_id, &statistics, sizeof(uint16_t), 0);
-// 	}
-// }
 
 //Recieve array data from client
 char *Receive_Array_Int_Data(int socket_identifier, int size){
@@ -38,30 +29,22 @@ char *Receive_Array_Int_Data(int socket_identifier, int size){
 	return results;
 }
 
-int main(int argc, char *argv[]) {
-	struct hostent *he;
-	struct sockaddr_in their_addr; /* connector's address information */
-	int sockfd, new_fd;  /* listen on sock_fd, new connection on new_fd */
-	socklen_t sin_size;
+void gen_player_welcome (void){
+	// Weclome MSG and prompt to log in for USER
+	printf("\nWeclome to MineSweaper Online. Please Log in using your details below");
+}
 
-	if ((he=gethostbyname(argv[1])) == NULL) {  /* get the host info */
-		herror("gethostbyname");
-		exit(1);
-	}
+void server_connect ( void ){
+	int server_socket = socket(AF_INET, SOCK_STREAM, 0); // AF_INET = Internet Protocol v4 Addresses (Family), SOCK_STREAM = TCP, 0 = protocol default
 
-	if ((sockfd = socket(AF_INET, SOCK_STREAM, 0)) == -1) {
-		perror("socket");
-		exit(1);
-	}
+	// // Start/define network services
+	struct sockaddr_in server_address; // address of server
+	server_address.sin_family = AF_INET; // Define protocol
+	server_address.sin_port = htons(MYPORT); // Use defined port
+	server_address.sin_addr.s_addr = INADDR_ANY; // Use any IP address on local machine IE 0.0.0.0 
 
-
-	their_addr.sin_family = AF_INET;      /* host byte order */
-	their_addr.sin_port = PORTNUMBER;    /* short, network byte order */
-	their_addr.sin_addr = *((struct in_addr *)he->h_addr);
-	bzero(&(their_addr.sin_zero), 8);     /* zero the rest of the struct */
-
-	if (connect(sockfd, (struct sockaddr *)&their_addr,	sizeof(struct sockaddr)) == -1) {
-		perror("connect");
+	if (connect(server_socket, (struct sockaddr *) &server_address, sizeof(server_address)) == -1) {
+		perror("\nUnable to connect to server. Check if the server is online.");
 		exit(1);
 	}
 
@@ -72,10 +55,7 @@ int main(int argc, char *argv[]) {
 
 		//Print out the array
 		printf("\n%s",results);
-		// for(int i = 0;i<ARRAY_SIZE;i++){
-		// 	printf("%s",results[i]);
-		// }
-
+	
 		free(results);
 
 		//These 100 values need to be changed so they can be used 
@@ -88,10 +68,11 @@ int main(int argc, char *argv[]) {
 		//send(sockfd,"All of array data received by server\n", 40 , 0);
 	}
 
-	//sleep(10);
+}
 
-	close(sockfd);
-	printf("\nSocket Closed");
+int main(int argc, char *argv[]) {
+	gen_player_welcome();
+	server_connect();
 
 	return 0;
 }
