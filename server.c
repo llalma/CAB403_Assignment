@@ -453,7 +453,6 @@ void server_setup ( void ){
 }
 
 int main ( void ){	
-	server_setup();
 
 	/////////////Testing functions work/////////////
 	srand(RANDOM_NUMBER_SEED);	//See random number generator
@@ -470,6 +469,8 @@ int main ( void ){
 
 	display_board();
 	printf("\n");
+	
+	server_setup();
 
 	return 0;
 }

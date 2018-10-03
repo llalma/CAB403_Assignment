@@ -42,13 +42,6 @@ void server_connect ( void ){
 	server_address.sin_port = htons(PORTNUMBER); // Use defined port
 	server_address.sin_addr.s_addr = INADDR_ANY; // Use any IP address on local machine IE 0.0.0.0 
 
-<<<<<<< HEAD
-=======
-	their_addr.sin_family = AF_INET;      /* host byte order */
-	their_addr.sin_port = htons(PORTNUMBER);    /* short, network byte order */
-	their_addr.sin_addr = *((struct in_addr *)he->h_addr);
-	bzero(&(their_addr.sin_zero), 8);     /* zero the rest of the struct */
->>>>>>> master
 
 	// Connect to the server and report if there is an error doing so
 	if (connect(server_socket, (struct sockaddr *) &server_address, sizeof(server_address)) == -1) {
@@ -58,6 +51,7 @@ void server_connect ( void ){
 
 	//Loop until user says to exit
 	while(1){
+		
 		//Recieve array data
 		char *results = Receive_Array_Int_Data(sockfd,  ARRAY_SIZE);
 
