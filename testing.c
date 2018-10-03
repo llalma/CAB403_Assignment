@@ -48,7 +48,7 @@ struct login {
     char *password;
 };
 
-//A node in a linked list of usernames and passwords
+// A node in a linked list of usernames and passwords
 typedef struct node_login node_login_t;
 
 struct node_login {
@@ -74,132 +74,8 @@ struct node_leaderboard {
     node_leaderboard_t *next;
 };
 
-//malloc this?
+//malloc this
 GameState gamestate;	//not sure if this was meant to be a global
-
-//Recieve array data from client
-// int *Receive_Array_Int_Data(int socket_identifier, int size){
-// 	int number_of_bytes;
-// 	uint16_t statistics;
-
-// 	int *results = malloc(sizeof(int)*size);
-// 	for(int i = 0;i<size;i++){
-// 		number_of_bytes = recv(socket_identifier, &statistics,sizeof(uint16_t),0);
-// 		results[i] = ntohs(statistics);
-// 	} 
-// 	return results;
-// }
-
-// //Send array data to client
-// void Send_Array_Data(int socket_id, int *myArray) {
-// 	int i=0;
-// 	uint16_t statistics;  
-// 	for (i = 0; i < ARRAY_SIZE; i++) {
-// 		statistics = htons(myArray[i]);
-// 		send(socket_id, &statistics, sizeof(uint16_t), 0);
-// 	}
-// }
-
-node_leaderboard_t * node_add_leaderboard(node_leaderboard_t *head, player_t *player){
-	//Input will be the head previous of where the new players is to be inserted
-
-	//create the new node
-	node_leaderboard_t *new = (node_leaderboard_t*) malloc(sizeof(node_leaderboard_t));
-	if(new == NULL){
-		return NULL;
-	}
-
-	if(head == NULL){
-
-		new->player = player;
-		new->next = head;
-
-
-		//If first item in leaderboard return this head, else dont.
-		return new;
-	}
-
-	node_leaderboard_t *previous = head;
-
-	new->player = player;
-	new->next = head;
-
-
-	//If first item in leaderboard return this head, else dont.
-	return NULL;
-}
-
-node_leaderboard_t* leaderboard_sort(node_leaderboard_t *head, player_t *player_new){
-
-	// //New player to add
-	// player_t *player_new = (player_t*)malloc(sizeof(player_t));
-	// //login_t *add_login = (login_t*)malloc(sizeof(login_t));
-
-	// //Populate new player with data
-	// player_new->username = "Paul";
-	// player_new->playtime = time(0);
-	// player_new->won = 10;
-	// player_new->played = 15;
-
-	node_leaderboard_t *previous = NULL;
-
-	if(head == NULL){
-
-		head = node_add_leaderboard(head,player_new);
-
-	}else{
-		//Rank based on based on time
-		
-		while(player_new->playtime < head->player->playtime){
-			previous = head;
-			head = head->next;
-			if(head == NULL){
-				break;
-			}
-		}
-		printf("\n%d\n",previous->next);
-		//Add new person into leaderboard
-		node_leaderboard_t *newnode =  node_add_leaderboard(previous,player_new);
-
-
-
-
-
-		if(head == NULL){
-			head = newnode; 
-		}
-	}
-
-	return head;
-
-	// //Check if times match
-	// if(player->time != head->player->time){
-	// 	//Add to list after head position
-	// }else{
-	// 	//Times match, therefore rank on games won
-	// 	if(player->won > head->player->won){
-	// 		//add to list here
-	// 	}else if(player->won < head->player->won){
-	// 		while(player->won <= head->player-won && player->time == head->player->time){
-	// 			head->next;
-	// 		}
-	// 		//add to list here
-	// 	}
-		
-	// 	}
-	// }
-
-}
-
-void print_leaderboard(node_leaderboard_t *head){
-	//Print titles
-	printf("\nUsername\t Time\t Games Won\t Games Played");
-
-	while(head != NULL){
-		printf("\n%s\t %d\t %d\t %d", head->player->username,head->player->playtime,head->player->won,head->player->played);
-		head = head->next;
-	}
-}
 
 
 void Send_Array_Data(int socket_id, char *text) {
@@ -285,6 +161,7 @@ node_login_t* load_auth(void){
 
 	node_login_t *data_list = NULL;
 	//Read single line of document at a time.
+
 	while(fgets(data,1000,Auth) != NULL){
 
 		//Seperate usernames and passwords into seperate strings
@@ -301,6 +178,7 @@ node_login_t* load_auth(void){
 			}
 			ptr = strtok(NULL," 	");
 		}
+	
 
 		//Dont add username and password as a valid login
 		if(strcmp("Username",username) != 0){
@@ -465,7 +343,7 @@ void place_flags(int x, int y){
 	}
 }
 
-//Server Function
+// User interface with server //
 int server_host(node_login_t* head_login){
 	int sockfd, new_fd, numbytes;  /* listen on sock_fd, new connection on new_fd */
 	struct sockaddr_in my_addr;     //my address information 
@@ -538,56 +416,6 @@ int server_host(node_login_t* head_login){
 			recv(new_fd, buf, MAXDATASIZE, 0);
 			Password = buf;
 
-			//Check user and pass, then return appropriate text
-			int login_state = check_login(head_login, Username,Password);
-
-			if(login_state == 2){
-				//Username and password are correct
-				text = "Welcome - ";
-				strcat(text,Username);
-				Send_Array_Data(new_fd,text);
-			}else{
-				Send_Array_Data(new_fd,"You entered either an incorrect username or password. Disconnecting.");
-				close(new_fd);
-				exit(0);
-				return 0;
-			}
-
-
-			//Loop until user closes connection
-			// while(1){
-			// 	/* Create an array of squares of first 30 whole numbers */
-			// 	// int simpleArray[ARRAY_SIZE] = {0};
-			// 	// for (int i = 0; i < ARRAY_SIZE; i++) {
-			// 	// 	simpleArray[i] = i * i;
-			// 	// }
-			// 	// simpleArray[0] = 1;
-
-			// 	//Send_Array_Data(new_fd, text);
-
-			// 	/* Receive message back from server */
-			// 	if ((numbytes=recv(new_fd, buf, MAXDATASIZE, 0)) == -1) {
-			// 		perror("recv");
-			// 		exit(1);
-			// 	}
-
-			// 	//Print stuff recieved from server.
-			// 	buf[numbytes] = '\0';
-
-			// 	//Either print recieved or break the while loop
-			// 	if(buf == "close\0"){
-			// 		break;
-			// 	}else{
-			// 		printf("Received: %s",buf);
-			// 	}
-			// }
-
-		//Convert users input to uppercase
-		// for(int i = 0;i<sizeof(input)/sizeof(char);i++){
-		// 	input[i] = toupper((int)input[i]);
-		// }
-		
-
 			//Close connection to player
 			close(new_fd);
 			exit(0);
@@ -595,7 +423,7 @@ int server_host(node_login_t* head_login){
 	}
 }
 
-int main(int argc, char **argv){
+void process( int argc, char **argv ){
 
 	srand(RANDOM_NUMBER_SEED);	//See random number generator
 
@@ -620,14 +448,6 @@ int main(int argc, char **argv){
 	//Placing mines, then print for confimation
 	place_mines();
 	
-	//testing where mines are
-	// for(int i = 0;i<NUM_TILES_Y;i++){		//Y values
-	// 	printf("\n");
-	// 	for(int j = 0;j<NUM_TILES_X;j++){		//X values
-	// 		printf(" %d ",gamestate.tiles[j][i].adjacent_mines);
-	// 	}
-	// }
-	//printf("\n");
 
 	////////////////////////////////////////////////////////////////
 
@@ -635,6 +455,7 @@ int main(int argc, char **argv){
 
 	//Place all usernames and passwords in a linked list, loads from text file
 	head_login = load_auth();
+	printf("\n, end \n");
 
 	//Print login list
 	//node_print(head_login);
@@ -663,27 +484,9 @@ int main(int argc, char **argv){
 	}
 	display_board();
 
-	// //sets back to unseen state
-	// for(int j = 0;j<9;j++){
-	// 	for(int i = 0;i<9;i++){
-	// 		gamestate.tiles[i][j].revealed =  false;
-	// 	}
-	// }
-
-
 	//Converts user input of char to number
 	char Userinput = 'A';
 	int row = (int)Userinput - (int)'A'+1;
-
-	// if(user_input(3,row) == 0){
-	// 	gameover = 0;	//Player lost as mine was selected
-	// }
-
-	//user_input(4,6);
-
-	//place_flags(3,4);
-
-	//display_board();
 
 	////////////////////////////////////////////////////////////////
 
@@ -704,45 +507,17 @@ int main(int argc, char **argv){
 		printf("\n Score = %ld",score);
 	}
 
-	////////////////////////////////////////////////////////////////
-	//Leaderboard
-
-	//Blank leaderboard initially
-	node_leaderboard_t *head = NULL;
-
-		//New player to add
-	player_t *player_new = (player_t*)malloc(sizeof(player_t));
-	//login_t *add_login = (login_t*)malloc(sizeof(login_t));
-
-	//Populate new player with data
-	player_new->username = "Paul";
-	player_new->playtime = time(0);
-	player_new->won = 10;
-	player_new->played = 15;
-
-		//New player to add
-	player_t *player_new1 = (player_t*)malloc(sizeof(player_t));
-	//login_t *add_login = (login_t*)malloc(sizeof(login_t));
-
-	sleep(1);
-	//Populate new player with data
-	player_new1->username = "jhon";
-	player_new1->playtime = time(0);
-	player_new1->won = 11;
-	player_new1->played = 18;
-
-	head = leaderboard_sort(head,player_new);
-	printf("\nhere\n");
-	leaderboard_sort(head,player_new1);
-
-	print_leaderboard(head);
-
-
-
-	////////////////////////////////////////////////////////////////
-
-	//Server Stuff
+	// Server login
 	server_host(head_login);
+}
+
+
+
+int main(int argc, char **argv){
+	// run process
+	process( argc, argv );
+
+
 }
 
 
