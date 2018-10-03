@@ -29,21 +29,23 @@ char *Receive_Array_Int_Data(int socket_identifier, int size){
 
 void gen_player_welcome (void){
 	// Weclome MSG and prompt to log in for USER
-	printf("\nWeclome to MineSweaper Online. Please Log in using your details below");
+	printf("\nWeclome to MineSweaper Online. Please Log in using your details below. \n");
 }
 
 void server_connect ( void ){
 	int sockfd, new_fd;  /* listen on sock_fd, new connection on new_fd */
 	int server_socket = socket(AF_INET, SOCK_STREAM, 0); // AF_INET = Internet Protocol v4 Addresses (Family), SOCK_STREAM = TCP, 0 = protocol default
 
-	// // Start/define network services
+	// Start/define network services
 	struct sockaddr_in server_address; // address of server
 	server_address.sin_family = AF_INET; // Define protocol
 	server_address.sin_port = htons(PORTNUMBER); // Use defined port
 	server_address.sin_addr.s_addr = INADDR_ANY; // Use any IP address on local machine IE 0.0.0.0 
 
+
+	// Connect to the server and report if there is an error doing so
 	if (connect(server_socket, (struct sockaddr *) &server_address, sizeof(server_address)) == -1) {
-		perror("\nUnable to connect to server. Check if the server is online.");
+		perror("\nUnable to connect to server. Check if the server is online. ");
 		exit(1);
 	}
 

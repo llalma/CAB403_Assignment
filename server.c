@@ -127,7 +127,7 @@ int check_login(node_login_t* head, char* username,char*  password){
 }
 
 
-int main ( ){	
+void server_setup ( void ){
 	printf("\nServer started.\n");
 
 	int server_socket = socket(AF_INET, SOCK_STREAM, 0); // AF_INET = Internet Protocol v4 Addresses (Family), SOCK_STREAM = TCP, 0 = protocol default
@@ -159,7 +159,10 @@ int main ( ){
 	if ( client_socket == -1 ){
 		printf("\nClient Unable to connect.");
 	}
-	
+}
+
+int main ( void ){	
+	server_setup();
 
 	return 0;
 }
