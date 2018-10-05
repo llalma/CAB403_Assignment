@@ -546,7 +546,7 @@ int server_setup ( void ){
 		*newsocket = client_socket;
 		pthread_create(&server_thread, NULL, server_handle, (void*) newsocket);
 
-
+		// I've tried with joining the thread and exiting it and not having this line of code at all.
 		pthread_join(server_thread,NULL);
 
 	}
