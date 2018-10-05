@@ -12,6 +12,7 @@
 #include <unistd.h>
 #include <stdbool.h>
 #include <time.h>
+#include <pthread.h>
 
 
 #define RANDOM_NUMBER_SEED 42 // Sead for randomisation
@@ -29,7 +30,7 @@
 #define MAXLOGINDATA 100
 
 // Global void pointer for pthreads
-void *server_thread
+void *server_handle;
 
 //////////Structures//////////
 
@@ -499,7 +500,7 @@ void client_login(int client_socket){
 
 int server_setup ( void ){
 	
-	int error, exit_check = 0, *newsocket;
+	int error, exit_check = 0, *newsocket, client_socket;
 	struct sockaddr_in their_addr; /* connector's address information */
 	socklen_t sin_size;
 
@@ -539,11 +540,14 @@ int server_setup ( void ){
 
 
 	// Client connection // NULL and NULL would be filed with STRUC if you want to know where the client is connecting from etc
-	while (int client_socket = accept(server_socket, (struct sockaddr *)&their_addr, &sin_size)){
-		pthread_t sever_thread;
-		new_socket = malloc(sizeof(new_socket));
-		*new_socket = client_socket;
-		pthread_create(&server_thread, NULL, server_thread, (void*) newsocket);
+	while ((client_socket = accept(server_socket, (struct sockaddr *)&their_addr, &sin_size))){
+		pthread_t server_thread;
+		newsocket = malloc(sizeof(client_socket));
+		*newsocket = client_socket;
+		pthread_create(&server_thread, NULL, server_handle, (void*) newsocket);
+
+
+		pthread_join(server_thread,NULL);
 
 	}
 
