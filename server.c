@@ -28,6 +28,9 @@
 //Define max transmit sizes
 #define MAXLOGINDATA 100
 
+// Global void pointer for pthreads
+void *server_thread
+
 //////////Structures//////////
 
 // Define log in structure
@@ -495,8 +498,8 @@ void client_login(int client_socket){
 }
 
 int server_setup ( void ){
-	printf("\nServer started.\n");
-
+	
+	int error, exit_check = 0, *newsocket;
 	struct sockaddr_in their_addr; /* connector's address information */
 	socklen_t sin_size;
 
@@ -512,8 +515,6 @@ int server_setup ( void ){
 	
 	// Bind the socket to the IP and PORT specified
 
-	int error;
-	int exit_check = 0;
 	do{
 		error = bind(server_socket, (struct sockaddr*) &server_address, sizeof(server_address));
 
@@ -532,15 +533,21 @@ int server_setup ( void ){
 		}
 	}while(error == -1);
 
-	printf("\nSocket is bound.");
-
 	// Start listening for connections
 	listen(server_socket, BACKLOG);
 	printf("\nServer is waiting for log in request...\n");
 
 
-	// Client connection
-	int client_socket = accept(server_socket, (struct sockaddr *)&their_addr, &sin_size); // NULL and NULL would be filed with STRUC if we want to know where the client is connecting from etc
+	// Client connection // NULL and NULL would be filed with STRUC if you want to know where the client is connecting from etc
+	while (int client_socket = accept(server_socket, (struct sockaddr *)&their_addr, &sin_size)){
+		pthread_t sever_thread;
+		new_socket = malloc(sizeof(new_socket));
+		*new_socket = client_socket;
+		pthread_create(&server_thread, NULL, server_thread, (void*) newsocket);
+
+	}
+
+	
 	if ( client_socket == -1 ){
 		printf("\nClient Unable to connect.");
 	}
@@ -574,7 +581,8 @@ int main ( void ){
 
 	//Place all usernames and passwords in a linked list, loads from text file
 	head_login = load_auth();
-	printf("Usernames in linked lists from text file.\n");
+	printf("\nServer started.\n");
+	printf("\nUsernames in linked lists from text file.\n");
 
 	server_setup();
 
