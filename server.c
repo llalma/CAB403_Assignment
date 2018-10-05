@@ -25,6 +25,9 @@
 #define NUM_TILES_Y 9
 #define NUM_MINES 10
 
+//Define max transmit sizes
+#define MAXLOGINDATA 100
+
 //////////Structures//////////
 
 // Define log in structure
@@ -76,6 +79,7 @@ typedef struct{
 //////////Globals//////////
 
 GameState gamestate;
+node_login_t *head_login;
 
 //////////Leaderboard//////////
 
@@ -241,6 +245,10 @@ node_login_t* load_auth(void){
 		if(strcmp("Username",username) != 0){
 			login_t *add_login = (login_t*)malloc(sizeof(login_t));
 
+			//Add \0 to end of username and passwords
+			username[strlen(username)] = '\0';
+			password[strlen(password)] = '\0';
+
 			//Populate add_login with data.
 			add_login->username = strdup(username);
 			add_login->password = strdup(password);
@@ -257,20 +265,28 @@ node_login_t* load_auth(void){
 	        data_list = newhead;
     	}
 	}
+
+	//Close connection with file.
+	fclose(Auth);
+
+	//Return head of list
+	return(data_list);
 }
 
 // Check inputted username and password against lists //
-int check_login(node_login_t* head, char* username,char*  password){
+int check_login(char* username,char*  password){
 	//Checks the users inputs for password and username against 
 	//linked list/Authentication.txt. 
 
-	for( ; head != NULL; head = head->next){
+	//Remove end of line char from user input for username,
+	//Not required for password as \0 is included at the ends of the passwords in the linked list.
+	username[strcspn(username, "\r\n")] = 0;
 
+	for( ; head_login != NULL; head_login = head_login->next){
 		//Check if username exists
-		if(strcmp(username, head->login->username) == 0){
-
+		if(strcmp(username, head_login->login->username) == 0){
 			//If the username is in list, check if cooresponding password matches input.
-			if(strcmp(password,head->login->password) == 0){
+			if(strcmp(password,head_login->login->password) == 0){
 				//Password matches and should login
 				return 2;
 			}else{
@@ -401,7 +417,7 @@ void display_board(void){
 	strcpy(letters,"ABCDEFGHI");
 
 	//Printing top 2 rows of board
-	printf("\n ");
+	printf("\n  ");
 	for(int i = 1;i<10;i++){
 		printf(" %d",i);
 	}
@@ -411,24 +427,81 @@ void display_board(void){
 	}
 
 	for(int i = 0; i<9;i++){
-		printf("\n%c",letters[i]);
+		printf("\n%c|",letters[i]);
 		for(int j = 0;j<9;j++){
 			printf(" %c", gamestate.tiles[i][j].revealed);
 		}
 	}
 }
 
-void server_setup ( void ){
+////////// Server & Client connection//////////
+
+void Send_Array_Data(int socket_id, char *text) {
+	uint16_t statistics;  
+	for (int i = 0; i < 150; i++) {
+		statistics = htons(text[i]);
+		send(socket_id, &statistics, sizeof(uint16_t), 0);
+	}
+}
+
+void client_play(int socket_id){
+	bool exit = false;
+	char buffer[MAXDATASIZE];
+
+	printf("\nSending\n");
+
+	//While user does not want to stop playing the game
+	while(!exit){
+		for(int i = 0;i<MAXDATASIZE;i++){
+			buffer[i] = ' ';
+		}
+
+		//Populate array with the gameboard
+		for(int i = 0;i<NUM_TILES_X;i++){
+			for(int j = 0;j<NUM_TILES_Y;j++){
+				buffer[j+i*10] = gamestate.tiles[i][j].revealed; 
+			}
+		}
+
+		Send_Array_Data(socket_id,buffer);
+
+		recv(socket_id,buffer,MAXDATASIZE,0);
+
+		printf("\n%s\n",buffer);
+	}
+}
+
+void client_login(int client_socket){
+	char username[MAXLOGINDATA];	//Store username from input
+	char password[MAXLOGINDATA];	//Store password from input
+
+	//Login
+	Send_Array_Data(client_socket,"Welcome to the online Minesweeper gaming system.\nYou are required to log on with your registered username and password\n\nUsername: ");
+	recv(client_socket, username, MAXLOGINDATA, 0);
+
+	Send_Array_Data(client_socket,"Password: ");
+	recv(client_socket, password, MAXLOGINDATA, 0);
+
+	if(check_login(username,password) == 2){
+		//User has successfully logged in
+		Send_Array_Data(client_socket,"Login Successful");
+		client_play(client_socket);
+	}else{
+		//User has entered invalid login details
+		Send_Array_Data(client_socket,"You entered either an incorrect username or password. Disconnecting.");
+		close(client_socket);
+		exit(0);
+	}
+}
+
+int server_setup ( void ){
 	printf("\nServer started.\n");
 
+	struct sockaddr_in my_addr;     //my address information 
+	struct sockaddr_in their_addr; /* connector's address information */
+	socklen_t sin_size;
+
 	int server_socket = socket(AF_INET, SOCK_STREAM, 0); // AF_INET = Internet Protocol v4 Addresses (Family), SOCK_STREAM = TCP, 0 = protocol default
-
-	//Heads of linked lists
-	node_login_t* head_login;
-
-	//Place all usernames and passwords in a linked list, loads from text file
-	head_login = load_auth();
-	printf("Usernames in linked lists from text file.\n");
 
 	// Start/define network services
 	printf("Server starts networking services.\n");
@@ -440,21 +513,49 @@ void server_setup ( void ){
 	
 	// Bind the socket to the IP and PORT specified
 
-	bind(server_socket, (struct sockaddr*) &server_address, sizeof(server_address));
+	int error;
+	int exit_check = 0;
+	do{
+		error = bind(server_socket, (struct sockaddr*) &server_address, sizeof(server_address));
+
+		//Only sleep if there is an error, if it binds a socket straight away, dont sleep.
+		if(error == -1){
+			printf("\nUnable to bind socket, will try again in 5 seconds");
+			sleep(5);
+			exit_check++;
+		}
+
+		//If after 50 seconds, the socket cannot be bound, 
+		//exit attempting to create the socket and print an error message.
+		if(exit_check > 10){
+			printf("\nSocket could no be bound, exiting.\n");
+			return 0;
+		}
+	}while(error == -1);
+
+	printf("\nSocket is bound.");
 
 	// Start listening for connections
 	listen(server_socket, BACKLOG);
 	printf("\nServer is waiting for log in request...\n");
+
+
 	// Client connection
-	int client_socket = accept(server_socket, NULL, NULL); // NULL and NULL would be filed with STRUC if we want to know where the client is connecting from etc
+	int client_socket = accept(server_socket, (struct sockaddr *)&their_addr, &sin_size); // NULL and NULL would be filed with STRUC if we want to know where the client is connecting from etc
 	if ( client_socket == -1 ){
 		printf("\nClient Unable to connect.");
 	}
-}
-// gitits shit
-int main ( void ){	
-	server_setup();
 
+	client_login(client_socket);
+
+	//Close socket connection
+	close(client_socket);
+	exit(0);
+}
+
+////////// Main //////////
+
+int main ( void ){	
 	/////////////Testing functions work/////////////
 	srand(RANDOM_NUMBER_SEED);	//See random number generator
 
@@ -467,9 +568,16 @@ int main ( void ){
 
 	user_input(2,1);
 	place_flags(1,1);
+	place_flags(2,2);
 
 	display_board();
 	printf("\n");
+
+	//Place all usernames and passwords in a linked list, loads from text file
+	head_login = load_auth();
+	printf("Usernames in linked lists from text file.\n");
+
+	server_setup();
 
 	return 0;
 }
