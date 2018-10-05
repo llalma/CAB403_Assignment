@@ -497,7 +497,6 @@ void client_login(int client_socket){
 int server_setup ( void ){
 	printf("\nServer started.\n");
 
-	struct sockaddr_in my_addr;     //my address information 
 	struct sockaddr_in their_addr; /* connector's address information */
 	socklen_t sin_size;
 
@@ -556,22 +555,22 @@ int server_setup ( void ){
 ////////// Main //////////
 
 int main ( void ){	
-	/////////////Testing functions work/////////////
-	srand(RANDOM_NUMBER_SEED);	//See random number generator
+	// /////////////Testing functions work/////////////
+	// srand(RANDOM_NUMBER_SEED);	//See random number generator
 
-	gamestate.gameover = 1;		//Initilise at 1, as game is not won or lost yet
-	gamestate.start_time = time(0);
-	gamestate.remaing_mines = NUM_MINES;
+	// gamestate.gameover = 1;		//Initilise at 1, as game is not won or lost yet
+	// gamestate.start_time = time(0);
+	// gamestate.remaing_mines = NUM_MINES;
 
-	//Placing mines, then print for confimation
-	place_mines();
+	// //Placing mines, then print for confimation
+	// place_mines();
 
-	user_input(2,1);
-	place_flags(1,1);
-	place_flags(2,2);
+	// user_input(2,1);
+	// place_flags(1,1);
+	// place_flags(2,2);
 
-	display_board();
-	printf("\n");
+	// display_board();
+	// printf("\n"); 
 
 	//Place all usernames and passwords in a linked list, loads from text file
 	head_login = load_auth();
