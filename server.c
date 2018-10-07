@@ -12,6 +12,7 @@
 #include <unistd.h>
 #include <stdbool.h>
 #include <time.h>
+#include <ctype.h>
 
 
 #define RANDOM_NUMBER_SEED 42 // Sead for randomisation
@@ -48,7 +49,7 @@ struct node_login {
 typedef struct player player_t;
 struct player {
     char *username;
-    time_t playtime;
+   time_t playtime;
     int won;
     int played;
 };
@@ -71,17 +72,56 @@ typedef struct{
 //Data type for the game state
 typedef struct{
 	int gameover;	
-	time_t start_time;
+	bool game_won;
 	int remaing_mines;
 	Tile tiles[NUM_TILES_X][NUM_TILES_Y];
+
+	char *username;
+	int won;
+	int played;
 } GameState;
 
 //////////Globals//////////
 
 GameState gamestate;
 node_login_t *head_login;
+char * UserName;
+node_leaderboard_t *head_leaderboard;
+
+//////////Send data to client//////////
+
+void Send_Array_Data(int socket_id, char *text) {
+	uint16_t statistics;  
+	for (int i = 0; i < 150; i++) {
+		statistics = htons(text[i]);
+		send(socket_id, &statistics, sizeof(uint16_t), 0);
+	}
+}
+
+void Send_Board(int socket_id) {
+	uint16_t statistics;  
+	for (int i = 0; i < 9; i++) {
+		for(int j =0;j<9;j++){
+			statistics = htons(gamestate.tiles[j][i].revealed);
+			send(socket_id, &statistics, sizeof(uint16_t), 0);
+		}
+	}
+}
 
 //////////Leaderboard//////////
+
+node_leaderboard_t* fill_leaderboard(node_leaderboard_t *head, player_t *player){
+	node_leaderboard_t *leaderboard_addition = (node_leaderboard_t*) malloc(sizeof(node_leaderboard_t));
+	if(leaderboard_addition == NULL){
+		return NULL;
+	}
+
+	//Add data
+	leaderboard_addition->player = player;
+	leaderboard_addition->next = head;
+
+	return leaderboard_addition;
+}
 
 void node_add_leaderboard(node_leaderboard_t *head, player_t *player){
 	//Will be inserted after head,Adds player between two nodes.
@@ -136,16 +176,27 @@ void leaderboard_sort(node_leaderboard_t *head, player_t *player_new){
 	node_add_leaderboard(head,player_new);	
 }
 
-void print_leaderboard(node_leaderboard_t *head){
+void print_leaderboard(node_leaderboard_t *head,int socket_id){
 	//Print each node in leaderboard, besides filler data.
 
 	//Print titles
-	printf("\nUsername\t Time\t Games Won\t Games Played");
+	//printf("\nUsername\t Time\t Games Won\t Games Played");
+	Send_Array_Data(socket_id,"\nUsername\t Time\t Games Won\t Games Played");
+
+	//First item will always have a won value of -1
+	head = head->next;
 
 	while(head != NULL & head->player->won != -1){
-		printf("\n%s\t %ld\t %d\t %d", head->player->username,head->player->playtime,head->player->won,head->player->played);
+		char row[50];
+		snprintf(row,sizeof(row),"\n%s\t %ld\t %d\t %d", head->player->username,head->player->playtime,head->player->won,head->player->played);
+
+		Send_Array_Data(socket_id,row);
+		//printf("\n%s\t %ld\t %d\t %d", head->player->username,head->player->playtime,head->player->won,head->player->played);
 		head = head->next;
 	}
+
+	//Signify end of leaderboard
+	Send_Array_Data(socket_id,"NULL");
 }
 
 //////////Creating gameboard//////////
@@ -287,7 +338,12 @@ int check_login(char* username,char*  password){
 		if(strcmp(username, head_login->login->username) == 0){
 			//If the username is in list, check if cooresponding password matches input.
 			if(strcmp(password,head_login->login->password) == 0){
-				//Password matches and should login
+				//Password matches and should login\
+
+				//Store data about logged in player in gamestate
+				gamestate.username = username;
+				gamestate.won = 0;
+				gamestate.played = 0;
 				return 2;
 			}else{
 				//Password is incorrect
@@ -392,7 +448,7 @@ int user_input(int x, int y){
 	}
 }
 
-void place_flags(int x, int y){
+void place_flags(int x, int y, int server_socket){
 	//Place a flag at the user specified. Decrement remaining_mines counter by 1.
 	//Flag cannot be placed on tile which is not a mine
 	
@@ -405,7 +461,8 @@ void place_flags(int x, int y){
 		reveal_selected_tile(x,y);
 		gamestate.remaing_mines--;
 	}else{
-		printf("No mine here");
+		//User tried to place flag where there was no mine
+		gamestate.tiles[x][y].revealed = 'X';
 	}
 }
 
@@ -429,46 +486,133 @@ void display_board(void){
 	for(int i = 0; i<9;i++){
 		printf("\n%c|",letters[i]);
 		for(int j = 0;j<9;j++){
-			printf(" %c", gamestate.tiles[i][j].revealed);
+			if(gamestate.tiles[j][i].revealed != 0){
+				printf(" %c", gamestate.tiles[j][i].revealed);
+			}else{
+				printf("  ");
+			}	
 		}
 	}
 }
 
-////////// Server & Client connection//////////
+void restart_game(void){
+	for(int j = 0;j<NUM_TILES_Y;j++){
+		for(int i = 0;i<NUM_TILES_X;i++){
+			gamestate.tiles[i][j].is_flag = false;
+			gamestate.tiles[i][j].is_mine = false;
+			gamestate.tiles[i][j].revealed = 0;
+			gamestate.tiles[i][j].adjacent_mines = 0;
 
-void Send_Array_Data(int socket_id, char *text) {
-	uint16_t statistics;  
-	for (int i = 0; i < 150; i++) {
-		statistics = htons(text[i]);
-		send(socket_id, &statistics, sizeof(uint16_t), 0);
+		}
 	}
+
+	//Placing mines
+	place_mines();
+
+	gamestate.game_won = NULL;
+	gamestate.gameover = 1;
+	gamestate.remaing_mines = NUM_MINES;
 }
 
-void client_play(int socket_id){
+void leaderboard_setup(void){
+	//Leaderboard stuff, simplify it
+	//Blank leaderboard initially
+	head_leaderboard = NULL;
+
+	//Filler data for 1st and last node
+	player_t *player_new = (player_t*)malloc(sizeof(player_t));
+	//login_t *add_login = (login_t*)malloc(sizeof(login_t));
+	//Populate new player with data
+	player_new->username = NULL;
+	player_new->playtime = time(0) - time(0);
+	player_new->won = -1;
+	player_new->played = -1;
+
+
+	//Add two bits of filler data in leaderboard
+	head_leaderboard = fill_leaderboard(head_leaderboard,player_new);
+	head_leaderboard = fill_leaderboard(head_leaderboard,player_new);
+}
+////////// Server & Client connection//////////
+
+bool client_play(int socket_id){
 	bool exit = false;
 	char buffer[MAXDATASIZE];
-
-	printf("\nSending\n");
+	char *row;
+	char input[5];
+	time_t start_time = time(0);
 
 	//While user does not want to stop playing the game
 	while(!exit){
-		for(int i = 0;i<MAXDATASIZE;i++){
-			buffer[i] = ' ';
-		}
 
-		//Populate array with the gameboard
-		for(int i = 0;i<NUM_TILES_X;i++){
-			for(int j = 0;j<NUM_TILES_Y;j++){
-				buffer[j+i*10] = gamestate.tiles[i][j].revealed; 
+		Send_Board(socket_id);
+
+		recv(socket_id,input,MAXDATASIZE,0);
+
+		//Covnvert users coordinates to integers
+		int Y_Coords = (int) toupper(input[1]) - (int)'A'+1;
+		int X_Coords = (int) input[2] - (int)'0';
+
+
+		if(toupper(input[0]) == 'R'){
+			//Reveal tile
+			if(user_input(X_Coords,Y_Coords) == 0){
+				//Player has selected a mine and lost
+				//Send_Array_Data(socket_id,"-You Lose");	
+				Send_Board(socket_id);
+				exit = true;
+				gamestate.game_won = false;
+				//Add 1 to games player for player
+				gamestate.played++;
 			}
+
+		}else if(toupper(input[0]) == 'P'){
+			//Place flag
+			place_flags(X_Coords,Y_Coords, socket_id);
+
+			//Check end game win condition.
+			if(gamestate.remaing_mines <= 0){
+				Send_Board(socket_id);
+				exit = true;
+				gamestate.game_won = true;
+
+				//Add 1 games won for player
+				gamestate.won++;
+				//Add 1 to games player for player
+				gamestate.played++;
+			}
+		}else if(toupper(input[0]) == 'Q'){
+			//Quit
+			exit = true;
+			gamestate.game_won = false;
+			//Add 1 to games player for player
+			gamestate.played++;
+			break;
 		}
-
-		Send_Array_Data(socket_id,buffer);
-
-		recv(socket_id,buffer,MAXDATASIZE,0);
-
-		printf("\n%s\n",buffer);
 	}
+
+	if(gamestate.game_won == true){
+		//Acutal player to add
+		player_t *player_new2 = (player_t*)malloc(sizeof(player_t));
+		//Populate new player with data
+		player_new2->username = gamestate.username;
+		player_new2->playtime = time(0) - start_time;
+		player_new2->won = gamestate.won;
+		player_new2->played = gamestate.played;
+
+		leaderboard_sort(head_leaderboard,player_new2);
+	}
+
+	print_leaderboard(head_leaderboard,socket_id);
+
+	recv(socket_id,input,MAXDATASIZE,0);
+
+	if(toupper(input[0]) == 'N'){
+		//Disconnect from client
+		close(socket_id);
+		return true;
+	}
+	return false;
 }
 
 void client_login(int client_socket){
@@ -485,7 +629,14 @@ void client_login(int client_socket){
 	if(check_login(username,password) == 2){
 		//User has successfully logged in
 		Send_Array_Data(client_socket,"Login Successful");
-		client_play(client_socket);
+
+		bool new_game = false;
+		while(!new_game){
+			restart_game();
+
+			new_game = client_play(client_socket);
+		}		
+
 	}else{
 		//User has entered invalid login details
 		Send_Array_Data(client_socket,"You entered either an incorrect username or password. Disconnecting.");
@@ -525,9 +676,9 @@ int server_setup ( void ){
 			exit_check++;
 		}
 
-		//If after 50 seconds, the socket cannot be bound, 
+		//If after 100 seconds, the socket cannot be bound, 
 		//exit attempting to create the socket and print an error message.
-		if(exit_check > 10){
+		if(exit_check > 20){
 			printf("\nSocket could no be bound, exiting.\n");
 			return 0;
 		}
@@ -556,22 +707,9 @@ int server_setup ( void ){
 ////////// Main //////////
 
 int main ( void ){	
-	/////////////Testing functions work/////////////
 	srand(RANDOM_NUMBER_SEED);	//See random number generator
 
-	gamestate.gameover = 1;		//Initilise at 1, as game is not won or lost yet
-	gamestate.start_time = time(0);
-	gamestate.remaing_mines = NUM_MINES;
-
-	//Placing mines, then print for confimation
-	place_mines();
-
-	user_input(2,1);
-	place_flags(1,1);
-	place_flags(2,2);
-
-	display_board();
-	printf("\n");
+	leaderboard_setup();
 
 	//Place all usernames and passwords in a linked list, loads from text file
 	head_login = load_auth();
