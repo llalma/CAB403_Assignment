@@ -65,7 +65,7 @@ struct node_leaderboard {
     node_leaderboard_t *next;
 };
 
-//Data type for a single tile on the board, revealed is a char so the correct value can be displayed
+// Data type for a single tile on the board, revealed is a char so the correct value can be displayed
 typedef struct{
 	int adjacent_mines;
 	char revealed;
@@ -73,13 +73,20 @@ typedef struct{
 	bool is_flag;
 } Tile;
 
-//Data type for the game state
+// Data type for the game state
 typedef struct{
 	int gameover;	
 	time_t start_time;
 	int remaing_mines;
 	Tile tiles[NUM_TILES_X][NUM_TILES_Y];
 } GameState;
+
+// Data Structure for thread queue
+typedef struct{
+	int front, rear, size;
+	unsigned capacity
+	int* array;
+} Queue;
 
 //////////Globals//////////
 
@@ -90,8 +97,11 @@ node_login_t *head_login;
 //////////Thread Pooling////////
 void* p_thread_create(void* arg) {
 	printf("New thread created!");
-
 }
+
+void thread_queue (void *arg, queue q)
+
+
 
 //////////Leaderboard//////////
 
@@ -509,7 +519,7 @@ void client_login(int client_socket){
 int server_setup ( void ){
 	
 	int error, exit_check = 0, *newsocket, client_socket;
-	struct sockaddr_in their_addr; /* connector's address information */
+	struct sockaddr_in client_addr; /* connector's address information */
 	socklen_t sin_size;
 
 	int server_socket = socket(AF_INET, SOCK_STREAM, 0); // AF_INET = Internet Protocol v4 Addresses (Family), SOCK_STREAM = TCP, 0 = protocol default
@@ -548,15 +558,13 @@ int server_setup ( void ){
 
 
 	// Client connection // NULL and NULL would be filed with STRUC if you want to know where the client is connecting from etc
-	while ((client_socket = accept(server_socket, (struct sockaddr *)&their_addr, &sin_size))){
+	while ((client_socket = accept(server_socket, (struct sockaddr *)&client_addr, &sin_size))){
+		printf("Server connected to: %s\n", inet_ntoa(client_addr.sin_addr));
+		newsocket = malloc(sizeof(struct sockaddr));
 
 
-
-
-		// add_request(requestcount, &request_mutex, &got request, client_socket);
 		//pthread_t server_thread;
-		// newsocket = malloc(sizeof(client_socket));
-		// *newsocket = client_socket;
+
 		//pthread_create(&server_thread, NULL, server_handle, (void*) newsocket);
 		// I've tried with joining the thread and exiting it and not having this line of code at all.
 		// pthread_join(server_thread,NULL);
