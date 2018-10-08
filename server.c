@@ -31,7 +31,7 @@
 
 // Global void pointer for pthreads
 void *server_handle;
-int num_requests
+int num_requests;
 
 //////////Structures//////////
 
@@ -87,86 +87,11 @@ GameState gamestate;
 node_login_t *head_login;
 
 
-
 //////////Thread Pooling////////
-void request_thread(pthread_mutex_t p_mutex, pthread_cond_t* p_cond_var, int newfd, int request_num){
-
-	int rc; 
-	struct request* a_request;
-
-	a_request = (struct request*)malloc(sizeof(struct request));
-	
-	a_request->number =request_num;
-	a_request->next = NULL;
-	a_request->newfd = newfd;
-
-	rc = pthread_mutex_lock(p_mutex); 
-
-	if (num_requests == 0){
-		requests = a_request;
-		last_request = a_request;
-	}
-	else{
-		last_request->next = a_request;
-		last_request = a_request;
-	}
-
-	num_requests++;
-
-	rc = pthread_mutex_unlock(p_mutex);
-
-	rc = pthread_cond_signal(p_cond_var);
+void* p_thread_create(void* arg) {
+	printf("New thread created!");
 
 }
-
-
-struct requests* get_request(pthread_mutex_t* p_mutex){
-	int rc;
-	struct request* a_request;
-
-	rc = pthread_mutex_lock(p_mutex);
-
-	if (num_requests > 0){
-		a_request = requests;
-		requests = a_request->next;
-		if (requests == NULL){
-			last_request = NULL;
-		}
-		num_requests--;
-	}
-	else {
-		a_request = NULL;
-	}
-
-	rc = pthread_mutex_unlock(p_mutex);
-
-	return a_request
-}
-
-void* handle_requests_loop(void* data) {
-    int rc;                        
-    struct request* a_request;      
-    int thread_id = *((int*)data);  
-    rc = pthread_mutex_lock(&request_mutex);
-
-    while (1) {
-        if (num_requests > 0) { 
-            a_request = get_request(&request_mutex);
-            if (a_request) { 
-                rc = pthread_mutex_unlock(&request_mutex);
-                handle_request(a_request, thread_id);
-                free(a_request);
-                rc = pthread_mutex_lock(&request_mutex);
-            }
-        }
-        else {                                  
-            rc = pthread_cond_wait(&got_request, &request_mutex);
-
-        }
-    }
-}
-
-
 
 //////////Leaderboard//////////
 
@@ -581,7 +506,7 @@ void client_login(int client_socket){
 	}
 }
 
-int server_setup ( int request_count ){
+int server_setup ( void ){
 	
 	int error, exit_check = 0, *newsocket, client_socket;
 	struct sockaddr_in their_addr; /* connector's address information */
@@ -624,17 +549,17 @@ int server_setup ( int request_count ){
 
 	// Client connection // NULL and NULL would be filed with STRUC if you want to know where the client is connecting from etc
 	while ((client_socket = accept(server_socket, (struct sockaddr *)&their_addr, &sin_size))){
-		requestcount++;
-		add_request(requestcount, &request_mutex, &got request, client_socket);
-		
-		
-		//pthread_t server_thread;
-		//newsocket = malloc(sizeof(client_socket));
-		//*newsocket = client_socket;
-		// pthread_create(&server_thread, NULL, server_handle, (void*) newsocket);
 
+
+
+
+		// add_request(requestcount, &request_mutex, &got request, client_socket);
+		//pthread_t server_thread;
+		// newsocket = malloc(sizeof(client_socket));
+		// *newsocket = client_socket;
+		//pthread_create(&server_thread, NULL, server_handle, (void*) newsocket);
 		// I've tried with joining the thread and exiting it and not having this line of code at all.
-		//pthread_join(server_thread,NULL);
+		// pthread_join(server_thread,NULL);
 
 	}
 
@@ -670,25 +595,37 @@ int main ( void ){
 	// display_board();
 	// printf("\n"); 
 
-	int request_count = 0, thread_ID[BACKLOG];
-	pthread_t p_thread[BACKLOG];
-	
-	for (i = 0; i < BACKLOG; i++){
-		thread_ID[i] = i;
-		pthread_create(&p_thread[i], NULL, handle_request_loop, (void*) &thread_ID[i])
 
-	}
+	int thread_ID[BACKLOG]; // Thread ID array size of BACKLOG
+	pthread_t thread_data_ID[BACKLOG];	// Thread ID array for pthread data type size of BACKLOG
 
 	//Place all usernames and passwords in a linked list, loads from text file
 	head_login = load_auth();
 	printf("\nServer started.\n");
 	printf("\nUsernames in linked lists from text file.\n");
 
-	server_setup(requestcount);
+	while(1){
+		// Create Pthread pool of 10 (size of BACKLOG)
+		for (int i = 0; i < BACKLOG; i++){
+			thread_ID[i] = i;
+			pthread_create(&thread_data_ID[i], NULL, p_thread_create, (void*) &thread_ID[i]);
+
+		}
+
+		server_setup();
+
+	}
+
+
+
+
+
+
+
 
 	// Re-join Threads
-	for (i = 0; i < BACKLOG; i++){
-		pthread_join(p_thread[i], NULL);
+	for (int i = 0; i < BACKLOG; i++){
+		pthread_join(thread_data_ID[i], NULL);
 	}
 
 	return 0;
