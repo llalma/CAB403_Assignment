@@ -18,7 +18,7 @@
 #define RANDOM_NUMBER_SEED 42 // Sead for randomisation
 
 #define MYPORT 12345    // the port users will be connecting to 
-#define BACKLOG 10     // how many pending connections queue will hold
+#define NUM_THREADS 10     // how many pending connections queue will hold
 #define MAXDATASIZE 1000 
 
 // Defining size of play area
@@ -31,7 +31,7 @@
 
 // Global void pointer for pthreads
 void *server_handle;
-int num_requests;
+int num_requests = 0; // Number of requests
 
 //////////Structures//////////
 
@@ -83,23 +83,127 @@ typedef struct{
 
 // Data Structure for thread queue
 typedef struct{
-	int front, rear, size;
-	unsigned capacity
-	int* array;
-} Queue;
+	int number; // Numer of the request
+	struct request* next // Pointer to last request
+} request;
+
+// linked lists head for request and last request for tracking
+struct request* last_request = NULL; 
+struct request* requests = NULL;
 
 //////////Globals//////////
-
 GameState gamestate;
 node_login_t *head_login;
 
 
 //////////Thread Pooling////////
-void* p_thread_create(void* arg) {
-	printf("New thread created!");
+
+void handle_request(struct request* a_request, int thread_id){
+	if (a_request){
+		printf("thread '%d' handled request '%d'\n", thread_id, a_request->number);
+		fflush(stdout);
+	}
 }
 
-void thread_queue (void *arg, queue q)
+
+void* p_thread_create(void* arg) {
+	int return_code; // Return code from pthread function
+	struct request* a_request; // Pointer to a request
+	int thread_id = *((int*)arg); // Thread identifying No.
+
+	// Lock thread
+	return_code = pthread_mutex_lock(&request_mutex);
+	
+	while(1) { // Loop forever 
+		if (num_requests > 0) { // If there is a queued request
+			// Get request from client
+			a_request = get_request(&request_mutex); 
+			if (a_request) { // Process request
+				// Unlock Mutex
+				return_code = pthread_mutex_unlock(&request_mutex);
+				// Send request to function for processing 
+				handle_request(a_request, thread_id);
+				// Free pointer and deallocate memory
+				free(a_request);
+				// Lock Mutex
+				return_code = pthread_mutex_lock(&request_mutex);
+			}
+		}
+		else {
+			return_code = pthread_cond_wait(&got_request, &request_mutex);
+			// Wait for request to arrive and Mutex will be unlocked
+			// to allow all other threads to access the requests linked list
+
+		}
+
+
+
+	}
+
+
+}
+
+
+void add_request(int request_num, pthread_mutex_t* p_mutex, pthread_cond_t* p_cond_var){
+	int return_code; // Return code from pthread function
+	struct request* a_request; // Pointer to newly added request
+
+	// Allocate memory the size of the structure request
+	a_request = (struct request*)malloc(sizeof(struct request));
+	a_request->number = request_num;
+	a_request->next = NULL;
+
+	// Lock thread 
+	return_code = pthread_mutex_lock(p_mutex); 
+
+	// Add new request to the end of the list and update the list.
+	// This accounts for if the list is empty
+	if (num_request == 0) {
+		request = a_request;
+		last_request = a_request;
+	} else {
+		last_request->next = a_request;
+		last_request = a_request;
+	}
+
+	// increase the number of pending requests by one
+	num_request++;
+
+	// Unlock thread
+	return_code = pthread_mutex_unlock(p_mutex);
+
+	// signal the condition variable - there's a new request to handle
+	return_code = pthread_cond_signal(p_cond_var);
+
+	// Add error handling
+}
+
+struct request* get_request(pthread_mutex_t* p_mutex){
+	int return_code; // Return code from pthread function
+	struct request* a_request; // Pointer to request
+
+	// Lock thread
+	return_code = pthread_mutex_lock(p_mutex);
+
+	if (num_request > 0 ) { // explain...
+		a_request = requests;
+		requests = a_request->next;
+		if (requests == NULL){ // last request on the list 
+			last_request = NULL;
+		}
+	
+	}	num_requests--; // reduce the number of requests by one
+	else {
+		a_request = NULL; // error handling if list 
+	}
+
+	// Unlock the thread
+	return_code = pthread_mutex_unlock(p_mutex);
+	
+	// return the request
+	return a_request; 
+}
+
 
 
 
@@ -553,7 +657,7 @@ int server_setup ( void ){
 	}while(error == -1);
 
 	// Start listening for connections
-	listen(server_socket, BACKLOG);
+	listen(server_socket, NUM_THREADS);
 	printf("\nServer is waiting for log in request...\n");
 
 
@@ -562,12 +666,6 @@ int server_setup ( void ){
 		printf("Server connected to: %s\n", inet_ntoa(client_addr.sin_addr));
 		newsocket = malloc(sizeof(struct sockaddr));
 
-
-		//pthread_t server_thread;
-
-		//pthread_create(&server_thread, NULL, server_handle, (void*) newsocket);
-		// I've tried with joining the thread and exiting it and not having this line of code at all.
-		// pthread_join(server_thread,NULL);
 
 	}
 
@@ -614,25 +712,15 @@ int main ( void ){
 
 	while(1){
 		// Create Pthread pool of 10 (size of BACKLOG)
-		for (int i = 0; i < BACKLOG; i++){
+		for (int i = 0; i < NUM_THREADS; i++){
 			thread_ID[i] = i;
 			pthread_create(&thread_data_ID[i], NULL, p_thread_create, (void*) &thread_ID[i]);
-
 		}
-
 		server_setup();
-
 	}
 
-
-
-
-
-
-
-
 	// Re-join Threads
-	for (int i = 0; i < BACKLOG; i++){
+	for (int i = 0; i < NUM_THREADS; i++){
 		pthread_join(thread_data_ID[i], NULL);
 	}
 
