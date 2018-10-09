@@ -1,5 +1,5 @@
 // Server Client
-
+#define _GNU_SOURCE
 #include <arpa/inet.h>
 #include <stdio.h> 
 #include <stdlib.h> 
@@ -32,6 +32,11 @@
 // Global void pointer for pthreads
 void *server_handle;
 int num_requests = 0; // Number of requests
+
+pthread_mutex_t request_mutex = PTHREAD_RECURSIVE_MUTEX_INITIALIZER_NP;
+
+/* global condition variable for our program. assignment initializes it. */
+pthread_cond_t  got_request   = PTHREAD_COND_INITIALIZER;
 
 //////////Structures//////////
 
@@ -82,10 +87,10 @@ typedef struct{
 } GameState;
 
 // Data Structure for thread queue
-typedef struct{
-	int number; // Numer of the request
-	struct request* next // Pointer to last request
-} request;
+struct request {
+    int number;             // number of the request                 
+    struct request* next;   // pointer to next request, NULL if none. 
+};
 
 // linked lists head for request and last request for tracking
 struct request* last_request = NULL; 
@@ -98,13 +103,76 @@ node_login_t *head_login;
 
 //////////Thread Pooling////////
 
-void handle_request(struct request* a_request, int thread_id){
-	if (a_request){
-		printf("thread '%d' handled request '%d'\n", thread_id, a_request->number);
-		fflush(stdout);
-	}
+void add_request(int request_num, pthread_mutex_t* p_mutex, pthread_cond_t* p_cond_var){
+	int return_code; // Return code from pthread function
+	struct request* a_request; // Pointer to newly added request
+
+	// Allocate memory the size of the structure request
+	a_request = (struct request*)malloc(sizeof(struct request));
+	a_request->number = request_num;
+	a_request->next = NULL;
+
+	// Lock thread 
+	return_code = pthread_mutex_lock(p_mutex); 
+
+	// Add new request to the end of the list and update the list.
+	// This accounts for if the list is empty
+    if (num_requests == 0) { /* special case - list is empty */
+        requests = a_request;
+        last_request = a_request;
+    }
+    else {
+        last_request->next = a_request;
+        last_request = a_request;
+    }
+
+	// increase the number of pending requests by one
+	num_requests++;
+
+	// Unlock thread
+	return_code = pthread_mutex_unlock(p_mutex);
+
+	// signal the condition variable - there's a new request to handle
+	return_code = pthread_cond_signal(p_cond_var);
+
+	// Add error handling
 }
 
+struct request* get_request(pthread_mutex_t* p_mutex){
+	int return_code; // Return code from pthread function
+	struct request* a_request; // Pointer to request
+
+	// Lock thread
+	return_code = pthread_mutex_lock(p_mutex);
+
+
+    if (num_requests > 0) { // explain...
+        a_request = requests;
+        requests = a_request->next;
+        if (requests == NULL) { // last request on the list 
+            last_request = NULL;
+        }
+       
+        num_requests--; // reduce the number of requests by one
+    }
+    else { // error handling if list 
+        a_request = NULL;
+    }
+
+	// Unlock the thread
+	return_code = pthread_mutex_unlock(p_mutex);
+	
+	// return the request
+	return a_request; 
+}
+
+void handle_request(struct request* a_request, int thread_id){
+    if (a_request) {
+        printf("Thread '%d' handled request '%d'\n",
+               thread_id, a_request->number);
+        fflush(stdout);
+    }
+}
 
 void* p_thread_create(void* arg) {
 	int return_code; // Return code from pthread function
@@ -139,73 +207,7 @@ void* p_thread_create(void* arg) {
 
 
 	}
-
-
 }
-
-
-void add_request(int request_num, pthread_mutex_t* p_mutex, pthread_cond_t* p_cond_var){
-	int return_code; // Return code from pthread function
-	struct request* a_request; // Pointer to newly added request
-
-	// Allocate memory the size of the structure request
-	a_request = (struct request*)malloc(sizeof(struct request));
-	a_request->number = request_num;
-	a_request->next = NULL;
-
-	// Lock thread 
-	return_code = pthread_mutex_lock(p_mutex); 
-
-	// Add new request to the end of the list and update the list.
-	// This accounts for if the list is empty
-	if (num_request == 0) {
-		request = a_request;
-		last_request = a_request;
-	} else {
-		last_request->next = a_request;
-		last_request = a_request;
-	}
-
-	// increase the number of pending requests by one
-	num_request++;
-
-	// Unlock thread
-	return_code = pthread_mutex_unlock(p_mutex);
-
-	// signal the condition variable - there's a new request to handle
-	return_code = pthread_cond_signal(p_cond_var);
-
-	// Add error handling
-}
-
-struct request* get_request(pthread_mutex_t* p_mutex){
-	int return_code; // Return code from pthread function
-	struct request* a_request; // Pointer to request
-
-	// Lock thread
-	return_code = pthread_mutex_lock(p_mutex);
-
-	if (num_request > 0 ) { // explain...
-		a_request = requests;
-		requests = a_request->next;
-		if (requests == NULL){ // last request on the list 
-			last_request = NULL;
-		}
-	
-	}	num_requests--; // reduce the number of requests by one
-	else {
-		a_request = NULL; // error handling if list 
-	}
-
-	// Unlock the thread
-	return_code = pthread_mutex_unlock(p_mutex);
-	
-	// return the request
-	return a_request; 
-}
-
-
-
 
 //////////Leaderboard//////////
 
@@ -702,8 +704,8 @@ int main ( void ){
 	// printf("\n"); 
 
 
-	int thread_ID[BACKLOG]; // Thread ID array size of BACKLOG
-	pthread_t thread_data_ID[BACKLOG];	// Thread ID array for pthread data type size of BACKLOG
+	int thread_ID[NUM_THREADS]; // Thread ID array size of BACKLOG
+	pthread_t thread_data_ID[NUM_THREADS];	// Thread ID array for pthread data type size of BACKLOG
 
 	//Place all usernames and passwords in a linked list, loads from text file
 	head_login = load_auth();
