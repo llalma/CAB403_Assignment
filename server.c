@@ -108,6 +108,8 @@ node_login_t *head_login;
 char * UserName;
 node_leaderboard_t *head_leaderboard;
 
+void handle_request();
+
 //////////Send data to client//////////
 
 void Send_Array_Data(int socket_id, char *text) {
@@ -195,13 +197,6 @@ struct request* get_request(pthread_mutex_t* p_mutex){
 	return a_request; 
 }
 
-void handle_request(struct request* a_request, int thread_id){
-    if (a_request) {
-        printf("Thread '%d' handled request '%d'\n",
-               thread_id, a_request->number);
-        fflush(stdout);
-    }
-}
 
 void* p_thread_create(void* arg) {
 	int return_code; // Return code from pthread function
@@ -774,6 +769,16 @@ void client_login(int client_socket){
 		exit(0);
 	}
 }
+
+void handle_request(struct request* a_request, int thread_id){
+    if (a_request) {
+        printf("Thread '%d' handled request '%d'\n",
+               thread_id, a_request->number);
+        client_login(a_request->client_socket);
+        fflush(stdout);
+    }
+}
+
 
 int server_setup ( int request_count ){
 	
