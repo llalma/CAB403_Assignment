@@ -1,6 +1,8 @@
 {
     "files.associations": {
         "types.h": "c",
-        "socket.h": "c"
+        "socket.h": "c",
+        "stdio.h": "c",
+        "stdlib.h": "c"
     }
 }
