@@ -730,13 +730,13 @@ bool client_play(int socket_id){
 
 	print_leaderboard(head_leaderboard,socket_id);
 
-	recv(socket_id,input,MAXDATASIZE,0);
+	//recv(socket_id,input,MAXDATASIZE,0);
 
-	if(toupper(input[0]) == 'N'){
-		//Disconnect from client
-		close(socket_id);
-		return true;
-	}
+	// if(toupper(input[0]) == 'N'){
+	// 	//Disconnect from client
+	// 	close(socket_id);
+	// 	return true;
+	// }
 	return false;
 }
 
@@ -757,9 +757,28 @@ void client_login(int client_socket){
 
 		bool new_game = false;
 		while(!new_game){
-			restart_game();
 
-			new_game = client_play(client_socket);
+			//Users selection from main menu
+			char selection[2];
+			recv(client_socket, selection, 2, 0);
+
+			if(toupper(selection[0]) == '3'){
+				//User wishes to exit
+				new_game = true;
+
+				//break;
+
+				//return 1;
+
+			}else if(toupper(selection[0]) == '2'){
+				//User wishes to see leaderboard
+				print_leaderboard(head_leaderboard,client_socket);
+			}else{
+				//User wishes to play game
+				restart_game();
+
+				new_game = client_play(client_socket);
+			}
 		}		
 
 	}else{
@@ -778,7 +797,6 @@ void handle_request(struct request* a_request, int thread_id){
         fflush(stdout);
     }
 }
-
 
 int server_setup ( int request_count ){
 	
@@ -810,7 +828,7 @@ int server_setup ( int request_count ){
 		//If after 100 seconds, the socket cannot be bound, 
 		//exit attempting to create the socket and print an error message.
 		if(exit_check > 20){
-			printf("\nSocket could no be bound, exiting.\n");
+			printf("\nSocket could not be bound, exiting.\n");
 			return 0;
 		}
 	}while(error == -1);
@@ -836,30 +854,14 @@ int server_setup ( int request_count ){
 	client_login(client_socket);
 
 	//Close socket connection
-	//close(client_socket);
-	//exit(0);
+	printf("\nSocket to client closed");	///////////////// Include clienr number
+	close(client_socket);
+	exit(0);
 }
 
 ////////// Main //////////
 
 int main ( void ){	
-	// /////////////Testing functions work/////////////
-	// srand(RANDOM_NUMBER_SEED);	//See random number generator
-
-	// gamestate.gameover = 1;		//Initilise at 1, as game is not won or lost yet
-	// gamestate.start_time = time(0);
-	// gamestate.remaing_mines = NUM_MINES;
-
-	// //Placing mines, then print for confimation
-	// place_mines();
-
-	// user_input(2,1);
-	// place_flags(1,1);
-	// place_flags(2,2);
-
-	// display_board();
-	// printf("\n"); 
-
 
 	int thread_ID[NUM_THREADS], request_count = 0; // Thread ID array size of BACKLOG
 	pthread_t thread_data_ID[NUM_THREADS];	// Thread ID array for pthread data type size of BACKLOG

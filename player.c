@@ -27,6 +27,7 @@ typedef struct{
 
 //Globals
 Board previous_board;	//saves previous state of board, for use in placing flags
+int remaining_mines;
 
 //Recieve array data from client
 char *Receive_Array_Int_Data(int socket_identifier, int size){
@@ -43,6 +44,9 @@ char *Receive_Array_Int_Data(int socket_identifier, int size){
 
 void display_board(Board board){
 	//Display current gameboard
+
+	//Display number of mines remining
+	printf("\nRemaining mines  = %d\n",remaining_mines);
 
 	//Create an array of letters to use
 	char letters[10]; // cause there is an end line char
@@ -73,7 +77,7 @@ void display_board(Board board){
 Board load_board(int server_socket){
 	int number_of_bytes;
 	uint16_t statistics;
-	int remaining_mines = NUM_MINES;
+	remaining_mines = NUM_MINES;
 	Board board;
 	board.game_state = 1;
 	bool flags_check = true;	//false = tried to place flag where there was no mine
@@ -159,62 +163,167 @@ bool check_input(char* input,Board board){
 	return input_check;
 }
 
-bool play_game(int server_socket, bool login){
+char main_menu(void){
+
+	printf("\n\nMain Menu");
+	printf("\nPlease enter a selection:	\n<1> Play MineSweeper \n<2> Show leaderboard \n<3> Quit\n");
+
+	//needs to auto change with any size input, might also need to change server file then.
+	char input[100];
+				
+	while(1){
+
+		//Loop until a valid input
+		input[0] = getchar();
+
+		if(input[0] == '3'){
+			//User has quit the game
+			return '3';
+		}else if(toupper(input[0]) == '1'){
+			//User wishes to play minesweeper
+			return '1';
+		}else if(toupper(input[0]) == '2'){
+			//User wishes to see leaderboard
+			return '2';
+		}else{
+			printf("\nInvalid input\n");
+		}
+	}
+}
+
+void leaderboard(int server_socket){
+
+	//Recieve leaderboard data
+	char *results = Receive_Array_Int_Data(server_socket,  ARRAY_SIZE);
+
+	while(strcmp(results, "NULL\0") != 0){
+		printf("\n%s",results);
+
+		results = Receive_Array_Int_Data(server_socket,ARRAY_SIZE);
+	}
+
+	// printf("\n\n%s\n","Play again? (Y/N)");
+
+	// //needs to auto change with any size input, might also need to change server file then.
+	// char input[2];
+	// fgets(input,2,stdin);
+
+	// while(toupper(input[0]) != 'Y' && toupper(input[0]) != 'N'){
+	// 	printf("Invalid input");
+	// 	printf("\n\n%s\n","Play again? (Y/N)");
+
+	// 	fgets(input,2,stdin);
+	// }
+
+	// send(server_socket,input,40,0);
+
+	// //Quit game
+	// if(toupper(input[0]) == 'N'){
+	// 	//Disconnect from server
+	// 	printf("\nThanks for playing MineSweaper!\n");
+	// 	return true;
+	// }
+
+	// //Clear input buffer
+	// while(getchar() != '\n');
+
+	// //Play new game.
+	// return false;	
+}
+
+
+int play_game(int server_socket, bool login){
+
+	//Users selection on the main menu
+	char selection = '0';
 
 	//Loop until user says to exit
 	while(1){
 
 		if(login == true){
 
-			Board board = load_board(server_socket);
+			if(selection == '0'){
+				selection = main_menu();
+				char Selection[2];
+				Selection[0] = (char)selection;
 
-			if(board.game_state == 0){
-				//Player has selected a mine and lost
-				printf("\n\nYou Lose\n");
-				break;
-			}else if(board.game_state == 2){
-				//Player has placed all the flags and won
-				printf("\n\nYou Win\n");
-				break;
-			}else{
+				//Send to server the users selection
+				send(server_socket,Selection ,2,0);
+			}
 
-				//Display options for user
-				printf("\nOptions:");
-				printf("\n<R> Reveal tile");
-				printf("\n<P> Place flag");
-				printf("\n<Q> Quit game\n");
+			if(selection == '3'){
+				//User has quit the game
+
+				//Clear input buffer
+				while(getchar() != '\n');
 				
-				//Need to ensure users input is correct format
-				printf("\nPlease input coordinates (Option)(A-I)(1-9)\n");	
+				printf("\nConnection to Server closed\n");
+				return 1;
+			}else if(selection == '2'){
+				//User wishes to see leaderboard
 
-				//needs to auto change with any size input, might also need to change server file then.
-				char input[5];
-				fgets(input,4,stdin);
+				//Clear input buffer
+				while(getchar() != '\n');
 
-				//Input verifications - True == input was allowed
-				bool input_check = check_input(input,board);
-				while(input_check == false){
-					display_board(board);
-					printf("\nInvalid input.");
-					printf("\nPlease input coordinates (Option)(A-I)(1-9)\n");
+				return 0;
+
+			}else{
+				//User wishes to play game
+
+				Board board = load_board(server_socket);
+
+				if(board.game_state == 0){
+					//Player has selected a mine and lost
+					printf("\n\nYou Lose\n");
+					selection = 0;
+					return 0;
+				}else if(board.game_state == 2){
+					//Player has placed all the flags and won
+					printf("\n\nYou Win\n");
+					selection = 0;
+					break;
+				}else{
+
+					//Display options for user
+					printf("\nOptions:");
+					printf("\n<R> Reveal tile");
+					printf("\n<P> Place flag");
+					printf("\n<Q> Quit game\n");
+					
+					//Need to ensure users input is correct format
+					printf("\nPlease input coordinates (Option)(A-I)(1-9)\n");	
 
 					//Clear input buffer
 					while(getchar() != '\n');	
 
-					//Get users input
+					//needs to auto change with any size input, might also need to change server file then.
+					char input[5];
 					fgets(input,4,stdin);
 
-					input_check = check_input(input,board);
-				}
+					//Input verifications - True == input was allowed
+					bool input_check = check_input(input,board);
 
-				//Send selection and users sqaure to server
-				send(server_socket,input,40,0);
-				
-				//Quit game
-				if(toupper(input[0]) == 'Q'){
-					break;
+					while(input_check == false){
+						display_board(board);
+						printf("\nInvalid input.");
+						printf("\nPlease input coordinates (Option)(A-I)(1-9)\n");
+
+						//Get users input
+						fgets(input,4,stdin);
+
+						input_check = check_input(input,board);
+					}
+					
+					//Send selection and users sqaure to server
+					send(server_socket,input,40,0);
+					
+					//Quit game
+					if(toupper(input[0]) == 'Q'){
+						selection = 0;;
+					}
 				}
-			}	
+			}
+
 			//Clear input buffer
 			while(getchar() != '\n');	
 
@@ -238,7 +347,7 @@ bool play_game(int server_socket, bool login){
 				free(results);
 
 				close(server_socket);
-				return true;
+				break;
 
 			}else{
 
@@ -260,48 +369,7 @@ bool play_game(int server_socket, bool login){
 				//send(sockfd,"All of array data received by server\n", 40 , 0);
 			}
 		}
-	}	
-}
-
-bool leaderboard(int server_socket){
-
-	//Recieve leaderboard data
-	char *results = Receive_Array_Int_Data(server_socket,  ARRAY_SIZE);
-
-	while(strcmp(results, "NULL\0") != 0){
-		printf("\n%s",results);
-
-		results = Receive_Array_Int_Data(server_socket,ARRAY_SIZE);
 	}
-
-	printf("\n\n%s\n","Play again? (Y/N)");
-
-	//needs to auto change with any size input, might also need to change server file then.
-	char input[2];
-	fgets(input,2,stdin);
-
-	while(toupper(input[0]) != 'Y' && toupper(input[0]) != 'N'){
-		printf("Invalid input");
-		printf("\n\n%s\n","Play again? (Y/N)");
-
-		fgets(input,2,stdin);
-	}
-
-	send(server_socket,input,40,0);
-
-	//Quit game
-	if(toupper(input[0]) == 'N'){
-		//Disconnect from server
-
-		printf("\nThanks for playing MineSweaper!\n");
-		return true;
-	}
-
-	//Clear input buffer
-	while(getchar() != '\n');
-
-	//Play new game.
-	return false;	
 }
 
 
@@ -323,13 +391,26 @@ int server_connect ( void ){
 
 	bool login = false;
 	bool quit_game = false;
-	while(!quit_game){
-		play_game(server_socket,login);
-		quit_game = leaderboard(server_socket);
 
+	//Display main menu
+	while(1){
 
-		login = true;
-	}	
+			if(play_game(server_socket,login) == 1){
+				//User has quit game
+				break;
+			}
+
+			//Clear input buffer
+			//while(getchar() != '\n');
+
+			printf("\nhere\n");
+
+			leaderboard(server_socket);
+			printf("\n");
+
+			login = true;
+		}
+	
 
 	//Close connection with server
 	close(server_socket);
