@@ -16,9 +16,8 @@
 #include <ctype.h>
 
 
-#define RANDOM_NUMBER_SEED 42 // Sead for randomisation
+#define RANDOM_NUMBER_SEED 42 // Seed for randomisation
 
-#define MYPORT 12345    // the port users will be connecting to 
 #define NUM_THREADS 10     // how many pending connections queue will hold
 #define MAXDATASIZE 1000 
 
@@ -107,12 +106,17 @@ GameState gamestate;
 node_login_t *head_login;
 char * UserName;
 node_leaderboard_t *head_leaderboard;
+int server_socket;
+
+int MYPORT = 12345;    // The port users will be connecting to 
 
 void handle_request();
 
 //////////Send data to client//////////
 
 void Send_Array_Data(int socket_id, char *text) {
+	//Send data to the client
+
 	uint16_t statistics;  
 	for (int i = 0; i < 150; i++) {
 		statistics = htons(text[i]);
@@ -121,6 +125,8 @@ void Send_Array_Data(int socket_id, char *text) {
 }
 
 void Send_Board(int socket_id) {
+	//Send each cell of the gameboard, one at a time.
+
 	uint16_t statistics;  
 	for (int i = 0; i < 9; i++) {
 		for(int j =0;j<9;j++){
@@ -236,31 +242,41 @@ void* p_thread_create(void* arg) {
 //////////Leaderboard//////////
 
 node_leaderboard_t* fill_leaderboard(node_leaderboard_t *head, player_t *player){
+	//Fill leaderboard with filler data
+
+	//New node to add to leaderboard
 	node_leaderboard_t *leaderboard_addition = (node_leaderboard_t*) malloc(sizeof(node_leaderboard_t));
+
+	//Check creation
 	if(leaderboard_addition == NULL){
 		return NULL;
 	}
 
-	//Add data
+	//Add data to new node
 	leaderboard_addition->player = player;
 	leaderboard_addition->next = head;
 
+	//Return new head of list
 	return leaderboard_addition;
 }
 
 void node_add_leaderboard(node_leaderboard_t *head, player_t *player){
-	//Will be inserted after head,Adds player between two nodes.
+	//Add new node to leaderboard, will insert new node immedietly after node given as head of the function.
+	//The new node will always be inserted between 2 nodes.
 
+	//New node to add
 	node_leaderboard_t *new_addition = (node_leaderboard_t*) malloc(sizeof(node_leaderboard_t));
 
+	//Populate new node with data
 	new_addition->player = player;
 	new_addition->next = head->next;
 
+	//Point head to new node just created.
 	head->next = new_addition;
 }
 
 void leaderboard_sort(node_leaderboard_t *head, player_t *player_new){
-	//With the new player to add, find their appropriate location in 
+	//With the new player to add, find the appropriate location in 
 	//the current leaderboard linked list
 
 	//Find in list where player_new time is less than position in lists time value
@@ -302,15 +318,15 @@ void leaderboard_sort(node_leaderboard_t *head, player_t *player_new){
 }
 
 void print_leaderboard(node_leaderboard_t *head,int socket_id){
-	//Print each node in leaderboard, besides filler data.
+	//Send each node in leaderboard, besides filler data.
 
-	//Print titles
-	//printf("\nUsername\t Time\t Games Won\t Games Played");
-	Send_Array_Data(socket_id,"\nUsername\t Time\t Games Won\t Games Played");
+	//Send titles
+	Send_Array_Data(socket_id,"\nUsername\t Time (Seconds)\t Games Won\t Games Played");
 
-	//First item will always have a won value of -1
+	//First item will always have a won value of -1, as it is filler data, therefore skip it.
 	head = head->next;
 
+	//While there is a row in the keaderboard which is no filler data send it, row by row.
 	while(head != NULL & head->player->won != -1){
 		char row[50];
 		snprintf(row,sizeof(row),"\n%s\t %ld\t %d\t %d", head->player->username,head->player->playtime,head->player->won,head->player->played);
@@ -322,6 +338,27 @@ void print_leaderboard(node_leaderboard_t *head,int socket_id){
 
 	//Signify end of leaderboard
 	Send_Array_Data(socket_id,"NULL");
+}
+
+void leaderboard_setup(void){
+	//Set up leaderboard
+
+	//Blank leaderboard initially
+	head_leaderboard = NULL;
+
+	//Filler data for 1st and last node
+	player_t *player_new = (player_t*)malloc(sizeof(player_t));
+	//login_t *add_login = (login_t*)malloc(sizeof(login_t));
+	//Populate new player with data
+	player_new->username = NULL;
+	player_new->playtime = time(0) - time(0);
+	player_new->won = -1;
+	player_new->played = -1;
+
+
+	//Add two bits of filler data in leaderboard
+	head_leaderboard = fill_leaderboard(head_leaderboard,player_new);
+	head_leaderboard = fill_leaderboard(head_leaderboard,player_new);
 }
 
 //////////Creating gameboard//////////
@@ -500,7 +537,6 @@ void reveal_selected_tile(int x,int y){
 	gamestate.tiles[x][y].revealed = revealed;
 }
 
-//might be broken
 void open_surrounding_tiles(int x, int y){
 	//Open us the surrounding tiles from user 
 	//selection where adjacent_mines == 0 until the tiles where
@@ -526,8 +562,6 @@ void open_surrounding_tiles(int x, int y){
 					open_surrounding_tiles(Adjacent_X,Adjacent_Y);
 				}else{
 					//Display one square, next to a 0.
-
-					//dosent work, if you click and edge of the 0s, e.g. (4,6)
 					reveal_selected_tile(Adjacent_X,Adjacent_Y);
 				}
 			}
@@ -621,6 +655,8 @@ void display_board(void){
 }
 
 void restart_game(void){
+	//Reset variables for the game
+
 	for(int j = 0;j<NUM_TILES_Y;j++){
 		for(int i = 0;i<NUM_TILES_X;i++){
 			gamestate.tiles[i][j].is_flag = false;
@@ -639,28 +675,11 @@ void restart_game(void){
 	gamestate.remaing_mines = NUM_MINES;
 }
 
-void leaderboard_setup(void){
-	//Leaderboard stuff, simplify it
-	//Blank leaderboard initially
-	head_leaderboard = NULL;
-
-	//Filler data for 1st and last node
-	player_t *player_new = (player_t*)malloc(sizeof(player_t));
-	//login_t *add_login = (login_t*)malloc(sizeof(login_t));
-	//Populate new player with data
-	player_new->username = NULL;
-	player_new->playtime = time(0) - time(0);
-	player_new->won = -1;
-	player_new->played = -1;
-
-
-	//Add two bits of filler data in leaderboard
-	head_leaderboard = fill_leaderboard(head_leaderboard,player_new);
-	head_leaderboard = fill_leaderboard(head_leaderboard,player_new);
-}
 ////////// Server & Client connection//////////
 
 bool client_play(int socket_id){
+	//Game loop
+
 	bool exit = false;
 	char buffer[MAXDATASIZE];
 	char *row;
@@ -670,15 +689,17 @@ bool client_play(int socket_id){
 	//While user does not want to stop playing the game
 	while(!exit){
 
+		//Send the gameboard state
 		Send_Board(socket_id);
 
+		//Recieve the user selection, place flag reveal square or quit.
 		recv(socket_id,input,MAXDATASIZE,0);
 
 		//Covnvert users coordinates to integers
 		int Y_Coords = (int) toupper(input[1]) - (int)'A'+1;
 		int X_Coords = (int) input[2] - (int)'0';
 
-
+		//Users selection -checking 0th position as that is where the user sepecifies the task
 		if(toupper(input[0]) == 'R'){
 			//Reveal tile
 			if(user_input(X_Coords,Y_Coords) == 0){
@@ -741,22 +762,29 @@ bool client_play(int socket_id){
 }
 
 void client_login(int client_socket){
+	//Get user to attempt a login
+
 	char username[MAXLOGINDATA];	//Store username from input
 	char password[MAXLOGINDATA];	//Store password from input
 
-	//Login
+	//Send login message
 	Send_Array_Data(client_socket,"Welcome to the online Minesweeper gaming system.\nYou are required to log on with your registered username and password\n\nUsername: ");
+	//Recieve users username input
 	recv(client_socket, username, MAXLOGINDATA, 0);
 
+	//Send password login message
 	Send_Array_Data(client_socket,"Password: ");
+	//Recieve users password input
 	recv(client_socket, password, MAXLOGINDATA, 0);
 
+	//Check login information
 	if(check_login(username,password) == 2){
 		//User has successfully logged in
 		Send_Array_Data(client_socket,"Login Successful");
 
 		bool new_game = false;
 		while(!new_game){
+			//Loop while user has not disconnected from server.
 
 			//Users selection from main menu
 			char selection[2];
@@ -766,10 +794,6 @@ void client_login(int client_socket){
 				//User wishes to exit
 				new_game = true;
 
-				//break;
-
-				//return 1;
-
 			}else if(toupper(selection[0]) == '2'){
 				//User wishes to see leaderboard
 				print_leaderboard(head_leaderboard,client_socket);
@@ -777,6 +801,7 @@ void client_login(int client_socket){
 				//User wishes to play game
 				restart_game();
 
+				//Begin a new game
 				new_game = client_play(client_socket);
 			}
 		}		
@@ -798,13 +823,24 @@ void handle_request(struct request* a_request, int thread_id){
     }
 }
 
+////////// exit catch/////////
+void exit_catch(int Signal){
+	//If ctrl+c is pressed clsoe the socket.
+	//send()
+	close(server_socket);
+}
+
 int server_setup ( int request_count ){
+	//Setup the server
 	
 	int error, exit_check = 0, *newsocket, client_socket;
 	struct sockaddr_in client_addr; /* connector's address information */
 	socklen_t sin_size;
 
-	int server_socket = socket(AF_INET, SOCK_STREAM, 0); // AF_INET = Internet Protocol v4 Addresses (Family), SOCK_STREAM = TCP, 0 = protocol default
+	server_socket = socket(AF_INET, SOCK_STREAM, 0); // AF_INET = Internet Protocol v4 Addresses (Family), SOCK_STREAM = TCP, 0 = protocol default
+
+	//Signal catch for ctrl+c
+	signal(SIGINT, exit_catch);
 
 	// Start/define network services
 	printf("Server starts networking services.\n");
@@ -854,19 +890,25 @@ int server_setup ( int request_count ){
 	client_login(client_socket);
 
 	//Close socket connection
-	printf("\nSocket to client closed");	///////////////// Include clienr number
+	printf("\nSocket to client closed");	///////////////// Include client number
 	close(client_socket);
 	exit(0);
 }
 
 ////////// Main //////////
 
-int main ( void ){	
+int main ( int argc, char *argv[] ){	
+
+	//If specified portm use that instead of the defualt.
+	if(argc >= 2){
+		MYPORT = htons(atoi(argv[1]));
+	}
 
 	int thread_ID[NUM_THREADS], request_count = 0; // Thread ID array size of BACKLOG
 	pthread_t thread_data_ID[NUM_THREADS];	// Thread ID array for pthread data type size of BACKLOG
 	srand(RANDOM_NUMBER_SEED);	//See random number generator
 
+	//Set up the leaderboard
 	leaderboard_setup();
 
 	//Place all usernames and passwords in a linked list, loads from text file
