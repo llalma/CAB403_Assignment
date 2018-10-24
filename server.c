@@ -917,7 +917,7 @@ int main ( int argc, char *argv[] ){
 	printf("\nUsernames in linked lists from text file.\n");
 
 	while(1){
-		// Create Pthread pool of 10 (size of BACKLOG)
+		// Create Pthread pool of 10 (size of NUM_THREADS)
 		for (int i = 0; i < NUM_THREADS; i++){
 			thread_ID[i] = i;
 			pthread_create(&thread_data_ID[i], NULL, p_thread_create, (void*) &thread_ID[i]);
