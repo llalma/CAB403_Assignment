@@ -494,12 +494,13 @@ int check_login(char* username,char*  password){
 	//Remove end of line char from user input for username,
 	//Not required for password as \0 is included at the ends of the passwords in the linked list.
 	username[strcspn(username, "\r\n")] = 0;
+	node_login_t *head = head_login;
 
-	for( ; head_login != NULL; head_login = head_login->next){
+	for( ; head != NULL; head = head->next){
 		//Check if username exists
-		if(strcmp(username, head_login->login->username) == 0){
+		if(strcmp(username, head->login->username) == 0){
 			//If the username is in list, check if cooresponding password matches input.
-			if(strcmp(password,head_login->login->password) == 0){
+			if(strcmp(password,head->login->password) == 0){
 				//Password matches and should login\
 
 				//Store data about logged in player in gamestate
@@ -516,6 +517,20 @@ int check_login(char* username,char*  password){
 
 	//Username is not in list.
 	return 0;
+}
+
+void print_login_list(node_login_t *head){
+
+
+	//While there is a row in the keaderboard which is no filler data send it, row by row.
+	while(head != NULL){
+		//snprintf(row,sizeof(row),"\n%s\t %ld\t %d\t %d", head->player->username,head->player->playtime,head->player->won,head->player->played);
+
+		//Send_Array_Data(socket_id,row);
+		printf("\n%s", head->login->username);
+		head = head->next;
+	}
+
 }
 
 ////////// Gameplay elemnts//////////
@@ -779,6 +794,7 @@ void client_login(int client_socket){
 
 	//Check login information
 	if(check_login(username,password) == 2){
+
 		//User has successfully logged in
 		Send_Array_Data(client_socket,"Login Successful");
 
