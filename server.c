@@ -1,5 +1,5 @@
 // Server Client
-#define _GNU_SOURCE
+
 #include <arpa/inet.h>
 #include <stdio.h> 
 #include <stdlib.h> 
@@ -15,9 +15,8 @@
 #include <pthread.h>
 #include <ctype.h>
 
-
+#define _GNU_SOURCE
 #define RANDOM_NUMBER_SEED 42 // Seed for randomisation
-
 #define NUM_THREADS 10     // how many pending connections queue will hold
 #define MAXDATASIZE 1000 
 
@@ -138,7 +137,6 @@ void Send_Board(int socket_id) {
 
 
 //////////Thread Pooling////////
-
 void add_request(int request_num, pthread_mutex_t* p_mutex, pthread_cond_t* p_cond_var, int client_socket){
 	int return_code; // Return code from pthread function
 	struct request* a_request; // Pointer to newly added request
@@ -895,12 +893,7 @@ int server_setup ( int request_count ){
 	exit(0);
 }
 
-<<<<<<< HEAD
 ////////// Main //////////
-=======
-int main ( void ){	
->>>>>>> playervsserver
-
 int main ( int argc, char *argv[] ){	
 
 	//If specified portm use that instead of the defualt.
@@ -929,17 +922,12 @@ int main ( int argc, char *argv[] ){
 		server_setup(request_count);
 	}
 
-<<<<<<< HEAD
 	// Re-join Threads
 	for (int i = 0; i < NUM_THREADS; i++){
 		pthread_join(thread_data_ID[i], NULL);
 	}
-=======
 	display_board();
 	printf("\n");
 	
-	server_setup();
->>>>>>> playervsserver
-
 	return 0;
 }
