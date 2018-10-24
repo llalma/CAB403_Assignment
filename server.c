@@ -895,7 +895,11 @@ int server_setup ( int request_count ){
 	exit(0);
 }
 
+<<<<<<< HEAD
 ////////// Main //////////
+=======
+int main ( void ){	
+>>>>>>> playervsserver
 
 int main ( int argc, char *argv[] ){	
 
@@ -925,10 +929,17 @@ int main ( int argc, char *argv[] ){
 		server_setup(request_count);
 	}
 
+<<<<<<< HEAD
 	// Re-join Threads
 	for (int i = 0; i < NUM_THREADS; i++){
 		pthread_join(thread_data_ID[i], NULL);
 	}
+=======
+	display_board();
+	printf("\n");
+	
+	server_setup();
+>>>>>>> playervsserver
 
 	return 0;
 }
