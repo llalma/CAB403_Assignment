@@ -313,7 +313,6 @@ int play_game(int server_socket, bool login){
 					char input[5];
 					fgets(input,4,stdin);
 
-					
 
 					//Input verifications - True == input was allowed
 					bool input_check = check_input(input,board);
@@ -399,7 +398,7 @@ int play_game(int server_socket, bool login){
 
 
 int server_connect ( void ){
-	int new_fd;  /* listen on sock_fd, new connection on new_fd */
+	int sock_fd, new_fd;  /* listen on sock_fd, new connection on new_fd */
 	int server_socket = socket(AF_INET, SOCK_STREAM, 0); // AF_INET = Internet Protocol v4 Addresses (Family), SOCK_STREAM = TCP, 0 = protocol default
 
 	// Start/define network services
@@ -408,10 +407,7 @@ int server_connect ( void ){
 	server_address.sin_port = htons(PORTNUMBER); // Use defined port
 	server_address.sin_addr.s_addr = INADDR_ANY; // Use any IP address on local machine IE 0.0.0.0 
 
-<<<<<<< HEAD
-=======
 
->>>>>>> playervsserver
 	// Connect to the server and report if there is an error doing so
 	if (connect(server_socket, (struct sockaddr *) &server_address, sizeof(struct sockaddr)) == -1) {
 		perror("\nUnable to connect to server. Check if the server is online. ");
@@ -422,12 +418,9 @@ int server_connect ( void ){
 	bool quit_game = false;
 
 	while(1){
-<<<<<<< HEAD
-=======
 		
 		//Recieve array data
-		char *results = Receive_Array_Int_Data(sockfd,  ARRAY_SIZE);
->>>>>>> playervsserver
+		char *results = Receive_Array_Int_Data(sock_fd,  ARRAY_SIZE);
 
 			//Check if user has quit game, this state will be impossible before the first iteration.
 			//The play game function is called as the input, the play game function is the game loop/

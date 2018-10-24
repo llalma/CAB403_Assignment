@@ -809,8 +809,9 @@ void client_login(int client_socket){
 	}else{
 		//User has entered invalid login details
 		Send_Array_Data(client_socket,"You entered either an incorrect username or password. Disconnecting.");
-		close(client_socket);
-		exit(0);
+
+		//close(client_socket);
+		//exit(0);
 	}
 }
 
@@ -895,12 +896,6 @@ int server_setup ( int request_count ){
 	exit(0);
 }
 
-<<<<<<< HEAD
-////////// Main //////////
-=======
-int main ( void ){	
->>>>>>> playervsserver
-
 int main ( int argc, char *argv[] ){	
 
 	//If specified portm use that instead of the defualt.
@@ -929,17 +924,13 @@ int main ( int argc, char *argv[] ){
 		server_setup(request_count);
 	}
 
-<<<<<<< HEAD
 	// Re-join Threads
 	for (int i = 0; i < NUM_THREADS; i++){
 		pthread_join(thread_data_ID[i], NULL);
 	}
-=======
 	display_board();
 	printf("\n");
 	
-	server_setup();
->>>>>>> playervsserver
 
 	return 0;
 }
