@@ -269,9 +269,6 @@ int play_game(int server_socket, bool login){
 			//User has selected a value on the main menu.
 			if(selection == '3'){
 				//User has quit the game
-
-				//Clear input buffer
-				while(getchar() != '\n');
 				
 				printf("\nConnection to Server closed\n");
 				return 1;
@@ -279,7 +276,7 @@ int play_game(int server_socket, bool login){
 				//User wishes to see leaderboard
 
 				//Clear input buffer
-				while(getchar() != '\n');
+				//while(getchar() != '\n');
 
 				return 0;
 
