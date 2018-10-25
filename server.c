@@ -795,7 +795,11 @@ void client_login(int client_socket){
 	}
 }
 
-
+void thread_join( pthread_t *thread_data_ID ){
+	for (int i = 0; i < NUM_THREADS; i++){
+		pthread_join(thread_data_ID[i], NULL);
+	}
+}
 
 int server_setup ( int request_count ){
 	//Setup the server
@@ -860,13 +864,6 @@ int server_setup ( int request_count ){
 }
 
 //////////exit catch/////////
-/* void ctrl_C_handler(int sig_num) { 
-    signal(SIGINT, ctrl_C_handler); 
-	server_running = false;
-    fflush(stdout); 
-} */ 
-
-
 void ctrl_C_handler(int sig_num) { 
     signal(SIGINT, ctrl_C_handler);
     printf("\n Client cannot be terminated using Ctrl+C! \n"); 
@@ -911,10 +908,7 @@ int main ( int argc, char *argv[] ){
 
 	// Clean up //
 	// Re-join Threads
-	for (int i = 0; i < NUM_THREADS; i++){
-		pthread_join(thread_data_ID[i], NULL);
-	}
-
+	thread_join(thread_data_ID);
 	close(server_socket);
 	return 0;
 }
