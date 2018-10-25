@@ -407,10 +407,6 @@ int server_connect ( void ){
 	server_address.sin_port = htons(PORTNUMBER); // Use defined port
 	server_address.sin_addr.s_addr = INADDR_ANY; // Use any IP address on local machine IE 0.0.0.0 
 
-<<<<<<< HEAD
-=======
-
->>>>>>> elliot_working
 	// Connect to the server and report if there is an error doing so
 	if (connect(server_socket, (struct sockaddr *) &server_address, sizeof(struct sockaddr)) == -1) {
 		perror("\nUnable to connect to server. Check if the server is online. ");
@@ -423,11 +419,7 @@ int server_connect ( void ){
 	while(1){
 		
 		//Recieve array data
-<<<<<<< HEAD
-		char *results = Receive_Array_Int_Data(sockfd,  ARRAY_SIZE);
-=======
 		char *results = Receive_Array_Int_Data(sock_fd,  ARRAY_SIZE);
->>>>>>> elliot_working
 
 			//Check if user has quit game, this state will be impossible before the first iteration.
 			//The play game function is called as the input, the play game function is the game loop/
