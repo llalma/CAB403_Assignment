@@ -171,8 +171,6 @@ void add_request(int request_num, pthread_mutex_t* p_mutex, pthread_cond_t* p_co
 
 	// signal the condition variable - there's a new request to handle
 	return_code = pthread_cond_signal(p_cond_var);
-
-	// Add error handling
 }
 
 struct request* get_request(pthread_mutex_t* p_mutex){
@@ -244,7 +242,7 @@ void handle_request(struct request* a_request, int thread_id){
 		}
         client_login(a_request->client_socket);
         fflush(stdout);
-    }
+    }	
 }
 
 //////////Leaderboard//////////
@@ -347,22 +345,16 @@ void print_leaderboard(node_leaderboard_t *head,int socket_id){
 }
 
 
-void leaderboard_setup(void){
-
-
+void leaderboard_setup(int request_count, int client_socket){
 	//Blank leaderboard initially
 	head_leaderboard = NULL;
-
 	//Filler data for 1st and last node
 	player_t *player_new = (player_t*)malloc(sizeof(player_t));
-	//login_t *add_login = (login_t*)malloc(sizeof(login_t));
 	//Populate new player with data
 	player_new->username = NULL;
 	player_new->playtime = time(0) - time(0);
 	player_new->won = -1;
 	player_new->played = -1;
-
-
 	//Add two bits of filler data in leaderboard
 	head_leaderboard = fill_leaderboard(head_leaderboard,player_new);
 	head_leaderboard = fill_leaderboard(head_leaderboard,player_new);
@@ -371,7 +363,6 @@ void leaderboard_setup(void){
 //////////Creating gameboard//////////
 bool tile_contains_mine(int x,int y, int socket_id){
 	//Check if tile in the x,y positon contains a mine
-
 	if(gamestate[socket_id-port_ID_pos].tiles[x][y].is_mine == true){
 		return true;
 	}
@@ -846,6 +837,8 @@ int server_setup ( int request_count ){
 		request_count++;
 		printf("Server connected to a client");
 		add_request(request_count, &request_mutex, &got_request, client_socket);
+		//Set up the leaderboard
+		leaderboard_setup(request_count, client_socket);
 	}
 	
 	// Error handling for a connection failure
@@ -879,8 +872,7 @@ int main ( int argc, char *argv[] ){
 	srand(RANDOM_NUMBER_SEED);	//See random number generator
 	server_running = true;
 	
-	//Set up the leaderboard
-	leaderboard_setup();
+
 
 	//Place all usernames and passwords in a linked list, loads from text file
 	head_login = load_auth();
