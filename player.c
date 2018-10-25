@@ -332,21 +332,21 @@ int play_game(int server_socket, bool login){
 					//Send selection to server
 					if(send(server_socket,input,40,0) == -1){
 						//Socket is closed, so disconnect
-
 						printf("\nSocket is closed\n");
 						close(server_socket);
 					}
 
-					
 					//Quit game
 					if(toupper(input[0]) == 'Q'){
 						selection = '0';
-					}
+					}else{
+						//Clear input buffer
+						while(getchar() != '\n');
+					}	
 				}
 			}
 
-			//Clear input buffer
-			while(getchar() != '\n');	
+
 
 		}else{	//Player has not logged in yet.
 			
