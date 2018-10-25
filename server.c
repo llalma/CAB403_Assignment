@@ -15,10 +15,7 @@
 #include <pthread.h>
 #include <ctype.h>
 
-<<<<<<< HEAD
 #define _GNU_SOURCE
-=======
->>>>>>> elliot_working
 #define RANDOM_NUMBER_SEED 42 // Seed for randomisation
 #define NUM_THREADS 10     // how many pending connections queue will hold
 #define MAXDATASIZE 1000 
@@ -870,10 +867,7 @@ int server_setup ( int request_count ){
 	exit(0);
 }
 
-<<<<<<< HEAD
 ////////// Main //////////
-=======
->>>>>>> elliot_working
 int main ( int argc, char *argv[] ){	
 	// IF specified PORT inputed by user use that instead of the default.
 	if(argc >= 2){
