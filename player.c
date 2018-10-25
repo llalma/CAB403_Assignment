@@ -350,7 +350,6 @@ int play_game(int server_socket, bool login){
 
 
 		}else{	//Player has not logged in yet.
-			
 			//Recieve login response
 			char *results = Receive_Array_Int_Data(server_socket,  ARRAY_SIZE);
 			

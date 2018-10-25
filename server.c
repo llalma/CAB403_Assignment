@@ -24,7 +24,7 @@
 // Defining size of play area
 #define NUM_TILES_X 9
 #define NUM_TILES_Y 9
-#define NUM_MINES 10
+#define NUM_MINES 1
 
 //Define max transmit sizes
 #define MAXLOGINDATA 100
@@ -82,7 +82,7 @@ typedef struct{
 	char *username;
 	int won;
 	int played;
-} GameState[14];  // Create GameState structure array size of 14
+} GameState[20];  // Create GameState structure array size of 14
 
 
 // Data Structure for thread queue
@@ -104,6 +104,7 @@ node_leaderboard_t *head_leaderboard;
 int server_socket; // Server socket global
 bool server_running; // Server running state
 int MYPORT = 12345;    // The default port if no port is specified
+int port_ID_pos;
 
 // Global void pointer for pthreads
 void *server_handle;
@@ -131,7 +132,7 @@ void Send_Board(int socket_id) {
 	uint16_t statistics;  
 	for (int i = 0; i < 9; i++) {
 		for(int j =0;j<9;j++){
-			statistics = htons(gamestate[socket_id].tiles[j][i].revealed);
+			statistics = htons(gamestate[socket_id-port_ID_pos].tiles[j][i].revealed);
 			send(socket_id, &statistics, sizeof(uint16_t), 0);
 		}
 	}
@@ -238,6 +239,9 @@ void handle_request(struct request* a_request, int thread_id){
     if (a_request) {
         printf("Thread '%d' handled request '%d'\n",
                thread_id, a_request->number);
+		if (port_ID_pos == 0){
+			port_ID_pos = a_request->client_socket;
+		}
         client_login(a_request->client_socket);
         fflush(stdout);
     }
@@ -335,7 +339,6 @@ void print_leaderboard(node_leaderboard_t *head,int socket_id){
 		snprintf(row,sizeof(row),"\n%s\t %ld\t %d\t %d", head->player->username,head->player->playtime,head->player->won,head->player->played);
 
 		Send_Array_Data(socket_id,row);
-		//printf("\n%s\t %ld\t %d\t %d", head->player->username,head->player->playtime,head->player->won,head->player->played);
 		head = head->next;
 	}
 
@@ -369,7 +372,7 @@ void leaderboard_setup(void){
 bool tile_contains_mine(int x,int y, int socket_id){
 	//Check if tile in the x,y positon contains a mine
 
-	if(gamestate[socket_id].tiles[x][y].is_mine == true){
+	if(gamestate[socket_id-port_ID_pos].tiles[x][y].is_mine == true){
 		return true;
 	}
 	return false;
@@ -395,14 +398,14 @@ void place_mines(int socket_id){
 				int Adjacent_Y = y+i-1;
 
 				if((Adjacent_X >= 0 && Adjacent_X < NUM_TILES_X) && (Adjacent_Y >= 0 && Adjacent_Y < NUM_TILES_Y)){
-					gamestate[socket_id].tiles[Adjacent_X][Adjacent_Y].adjacent_mines++;
+					gamestate[socket_id-port_ID_pos].tiles[Adjacent_X][Adjacent_Y].adjacent_mines++;
 				}				
 			}
 		}
 
 		//Change specific tile to a mine
-		gamestate[socket_id].tiles[x][y].is_mine = true;
-		gamestate[socket_id].tiles[x][y].adjacent_mines = -1;	//Set to -1, as adjacent mines dosnt make sense here
+		gamestate[socket_id-port_ID_pos].tiles[x][y].is_mine = true;
+		gamestate[socket_id-port_ID_pos].tiles[x][y].adjacent_mines = -1;	//Set to -1, as adjacent mines dosnt make sense here
 	}
 }	
 
@@ -419,7 +422,6 @@ node_login_t * node_add_login(node_login_t *head, login_t *login){
 	//Add data
 	new->login = login;
 	new->next = head;
-
 	return new;
 }
 
@@ -506,9 +508,9 @@ int check_login(char* username,char*  password, int socket_id){
 				//Password matches and should login\
 
 				//Store data about logged in player in gamestate
-				gamestate[socket_id].username = username;
-				gamestate[socket_id].won = 0;
-				gamestate[socket_id].played = 0;
+				gamestate[socket_id-port_ID_pos].username = username;
+				gamestate[socket_id-port_ID_pos].won = 0;
+				gamestate[socket_id-port_ID_pos].played = 0;
 				return 2;
 			}else{
 				//Password is incorrect
@@ -526,8 +528,6 @@ void print_login_list(node_login_t *head){
 
 	//While there is a row in the keaderboard which is no filler data send it, row by row.
 	while(head != NULL){
-		//snprintf(row,sizeof(row),"\n%s\t %ld\t %d\t %d", head->player->username,head->player->playtime,head->player->won,head->player->played);
-
 		//Send_Array_Data(socket_id,row);
 		printf("\n%s", head->login->username);
 		head = head->next;
@@ -541,16 +541,16 @@ void reveal_selected_tile(int x,int y, int socket_id){
 
 	char revealed;
 
-	if(gamestate[socket_id].tiles[x][y].is_flag == true){
+	if(gamestate[socket_id-port_ID_pos].tiles[x][y].is_flag == true){
 		revealed = '+';
-	}else if(gamestate[socket_id].tiles[x][y].is_mine == true){
+	}else if(gamestate[socket_id-port_ID_pos].tiles[x][y].is_mine == true){
 		revealed = '*';
 	}else{
 		//Add 0, to make the adjacent_mines the correct ascii character
-		revealed = gamestate[socket_id].tiles[x][y].adjacent_mines + '0';
+		revealed = gamestate[socket_id-port_ID_pos].tiles[x][y].adjacent_mines + '0';
 	}
 
-	gamestate[socket_id].tiles[x][y].revealed = revealed;
+	gamestate[socket_id-port_ID_pos].tiles[x][y].revealed = revealed;
 }
 
 void open_surrounding_tiles(int x, int y, int socket_id){
@@ -570,7 +570,7 @@ void open_surrounding_tiles(int x, int y, int socket_id){
 			if((Adjacent_X >= 0 && Adjacent_X < NUM_TILES_X) && (Adjacent_Y >= 0 && Adjacent_Y < NUM_TILES_Y)){
 				
 				//Checks if it has 0 adjacent mines and is not revealed yet.
-				if(gamestate[socket_id].tiles[Adjacent_X][Adjacent_Y].adjacent_mines == 0 && gamestate[socket_id].tiles[Adjacent_X][Adjacent_Y].revealed == false){
+				if(gamestate[socket_id-port_ID_pos].tiles[Adjacent_X][Adjacent_Y].adjacent_mines == 0 && gamestate[socket_id-port_ID_pos].tiles[Adjacent_X][Adjacent_Y].revealed == false){
 					
 					//Displays the tile, then calls the same function, 
 					//to search the surrounding tiles of that sqaure for adjacent_mines == 0;
@@ -598,18 +598,18 @@ int user_input(int x, int y, int socket_id){
 	//Reveal the selected tile
 	reveal_selected_tile(x,y, socket_id);
 
-	if(gamestate[socket_id].tiles[x][y].is_mine == true){
+	if(gamestate[socket_id-port_ID_pos].tiles[x][y].is_mine == true){
 		//Selected tile was a mine, change all tiles with mines is_revealed to true
 		for(int i = 0;i<NUM_TILES_Y;i++){		//Y values
 			for(int j = 0;j<NUM_TILES_X;j++){		//X values
-				if(gamestate[socket_id].tiles[j][i].is_mine == true){
+				if(gamestate[socket_id-port_ID_pos].tiles[j][i].is_mine == true){
 					reveal_selected_tile(j,i, socket_id);
 				}
 			}
 		}
 		return 0;
 
-	}else if(gamestate[socket_id].tiles[x][y].adjacent_mines >0){
+	}else if(gamestate[socket_id-port_ID_pos].tiles[x][y].adjacent_mines >0){
 		//If the adjacent_mines number is not 0, only make the sqaure selected visable
 		return 1;
 
@@ -630,13 +630,13 @@ void place_flags(int x, int y, int socket_id){
 	x--;
 	y--;
 
-	if(gamestate[socket_id].tiles[x][y].is_mine == true){
-		gamestate[socket_id].tiles[x][y].is_flag = true;
+	if(gamestate[socket_id-port_ID_pos].tiles[x][y].is_mine == true){
+		gamestate[socket_id-port_ID_pos].tiles[x][y].is_flag = true;
 		reveal_selected_tile(x,y, socket_id);
-		gamestate[socket_id].remaing_mines--;
+		gamestate[socket_id-port_ID_pos].remaing_mines--;
 	}else{
 		//User tried to place flag where there was no mine
-		gamestate[socket_id].tiles[x][y].revealed = 'X';
+		gamestate[socket_id-port_ID_pos].tiles[x][y].revealed = 'X';
 	}
 }
 
@@ -645,10 +645,10 @@ void restart_game(int socket_id){
 
 	for(int j = 0;j<NUM_TILES_Y;j++){
 		for(int i = 0;i<NUM_TILES_X;i++){
-			gamestate[socket_id].tiles[i][j].is_flag = false;
-			gamestate[socket_id].tiles[i][j].is_mine = false;
-			gamestate[socket_id].tiles[i][j].revealed = 0;
-			gamestate[socket_id].tiles[i][j].adjacent_mines = 0;
+			gamestate[socket_id-port_ID_pos].tiles[i][j].is_flag = false;
+			gamestate[socket_id-port_ID_pos].tiles[i][j].is_mine = false;
+			gamestate[socket_id-port_ID_pos].tiles[i][j].revealed = 0;
+			gamestate[socket_id-port_ID_pos].tiles[i][j].adjacent_mines = 0;
 
 		}
 	}
@@ -656,9 +656,9 @@ void restart_game(int socket_id){
 	//Placing mines
 	place_mines(socket_id);
 
-	gamestate[socket_id].game_won = NULL;
-	gamestate[socket_id].gameover = 1;
-	gamestate[socket_id].remaing_mines = NUM_MINES;
+	gamestate[socket_id-port_ID_pos].game_won = NULL;
+	gamestate[socket_id-port_ID_pos].gameover = 1;
+	gamestate[socket_id-port_ID_pos].remaing_mines = NUM_MINES;
 }
 
 ////////// Server & Client connection//////////
@@ -689,12 +689,11 @@ bool client_play(int socket_id){
 			//Reveal tile
 			if(user_input(X_Coords,Y_Coords, socket_id) == 0){
 				//Player has selected a mine and lost
-				//Send_Array_Data(socket_id,"-You Lose");	
 				Send_Board(socket_id);
 				exit = true;
-				gamestate[socket_id].game_won = false;
+				gamestate[socket_id-port_ID_pos].game_won = false;
 				//Add 1 to games player for player
-				gamestate[socket_id].played++;
+				gamestate[socket_id-port_ID_pos].played++;
 			}
 
 		}else if(toupper(input[0]) == 'P'){
@@ -702,36 +701,34 @@ bool client_play(int socket_id){
 			place_flags(X_Coords,Y_Coords, socket_id);
 
 			//Check end game win condition.
-			if(gamestate[socket_id].remaing_mines <= 0){
+			if(gamestate[socket_id-port_ID_pos].remaing_mines <= 0){
 				Send_Board(socket_id);
 				exit = true;
-				gamestate[socket_id].game_won = true;
+				gamestate[socket_id-port_ID_pos].game_won = true;
 
 				//Add 1 games won for player
-				gamestate[socket_id].won++;
+				gamestate[socket_id-port_ID_pos].won++;
 				//Add 1 to games player for player
-				gamestate[socket_id].played++;
+				gamestate[socket_id-port_ID_pos].played++;
 			}
 		}else if(toupper(input[0]) == 'Q'){
 			//Quit
 			exit = true;
-			gamestate[socket_id].game_won = false;
+			gamestate[socket_id-port_ID_pos].game_won = false;
 			//Add 1 to games player for player
-			gamestate[socket_id].played++;
+			gamestate[socket_id-port_ID_pos].played++;
 			break;
 		}
 	}
 
-
-	if(gamestate[socket_id].game_won == true){
+	if(gamestate[socket_id-port_ID_pos].game_won == true){
 		//Acutal player to add
 		player_t *player_new2 = (player_t*)malloc(sizeof(player_t));
 		//Populate new player with data
-		player_new2->username = gamestate[socket_id].username;
+		player_new2->username = gamestate[socket_id-port_ID_pos].username;
 		player_new2->playtime = time(0) - start_time;
-		player_new2->won = gamestate[socket_id].won;
-		player_new2->played = gamestate[socket_id].played;
-
+		player_new2->won = gamestate[socket_id-port_ID_pos].won;
+		player_new2->played = gamestate[socket_id-port_ID_pos].played;
 		leaderboard_sort(head_leaderboard,player_new2);
 		
 	}
@@ -755,6 +752,10 @@ void client_login(int client_socket){
 	Send_Array_Data(client_socket,"Password: ");
 	//Recieve users password input
 	recv(client_socket, password, MAXLOGINDATA, 0);
+
+	for ( int i = 0; i < 14; i++){
+		printf("\n%s", gamestate[i].username);
+	}
 
 	//Check login information
 	if(check_login(username,password, client_socket) == 2){
@@ -790,8 +791,6 @@ void client_login(int client_socket){
 		//User has entered invalid login details
 		Send_Array_Data(client_socket,"You entered either an incorrect username or password. Disconnecting.");
 
-		//close(client_socket);
-		//exit(0);
 	}
 }
 
@@ -853,9 +852,6 @@ int server_setup ( int request_count ){
 	if ( client_socket == -1 ){
 		printf("\nClient Unable to connect.");
 	}
-
-	// Send client the login request
-	client_login(client_socket);
 
 	//Close socket connection
 	printf("\nSocket to client closed");
