@@ -27,17 +27,12 @@
 //Define max transmit sizes
 #define MAXLOGINDATA 100
 
-// Global void pointer for pthreads
-void *server_handle;
-int num_requests = 0; // Number of requests
-
 pthread_mutex_t request_mutex = PTHREAD_RECURSIVE_MUTEX_INITIALIZER_NP;
 
 /* global condition variable for our program. assignment initializes it. */
 pthread_cond_t  got_request   = PTHREAD_COND_INITIALIZER;
 
 //////////Structures//////////
-
 // Define log in structure
 typedef struct login login_t;
 struct login {
@@ -85,9 +80,7 @@ typedef struct{
 	char *username;
 	int won;
 	int played;
-} GameState[NUM_THREADS];  // Create GameState linked list array size of NUM_threads
-
-
+} GameState[14];  // Create GameState structure array size of 14
 
 
 // Data Structure for thread queue
@@ -104,16 +97,22 @@ struct request* requests = NULL;
 //////////Globals//////////
 GameState gamestate;
 node_login_t *head_login;
-char * UserName;
+//char * UserName; // 
 node_leaderboard_t *head_leaderboard;
-int server_socket;
+int server_socket; // Server socket global
+static bool server_running = true; // Server running state
+int MYPORT = 12345;    // The default port if no port is specified
 
-int MYPORT = 12345;    // The port users will be connecting to 
+// Global void pointer for pthreads
+void *server_handle;
+int num_requests = 0; // Number of requests
 
+
+// Define required functions to avoid  ordering errors.
+void client_login();
 void handle_request();
 
 //////////Send data to client//////////
-
 void Send_Array_Data(int socket_id, char *text) {
 	//Send data to the client
 
@@ -136,7 +135,7 @@ void Send_Board(int socket_id) {
 	}
 }
 
-//////////Thread Pooling////////
+//////////Thread Pooling and Request management////////
 void add_request(int request_num, pthread_mutex_t* p_mutex, pthread_cond_t* p_cond_var, int client_socket){
 	int return_code; // Return code from pthread function
 	struct request* a_request; // Pointer to newly added request
@@ -200,7 +199,6 @@ struct request* get_request(pthread_mutex_t* p_mutex){
 	return a_request; 
 }
 
-
 void* p_thread_create(void* arg) {
 	int return_code; // Return code from pthread function
 	struct request* a_request; // Pointer to a request
@@ -231,14 +229,19 @@ void* p_thread_create(void* arg) {
 			// to allow all other threads to access the requests linked list
 
 		}
-
-
-
 	}
 }
 
-//////////Leaderboard//////////
+void handle_request(struct request* a_request, int thread_id){
+    if (a_request) {
+        printf("Thread '%d' handled request '%d'\n",
+               thread_id, a_request->number);
+        client_login(a_request->client_socket);
+        fflush(stdout);
+    }
+}
 
+//////////Leaderboard//////////
 node_leaderboard_t* fill_leaderboard(node_leaderboard_t *head, player_t *player){
 	//Fill leaderboard with filler data
 
@@ -338,8 +341,9 @@ void print_leaderboard(node_leaderboard_t *head,int socket_id){
 	Send_Array_Data(socket_id,"NULL");
 }
 
+
 void leaderboard_setup(void){
-	//Set up leaderboard
+
 
 	//Blank leaderboard initially
 	head_leaderboard = NULL;
@@ -360,7 +364,6 @@ void leaderboard_setup(void){
 }
 
 //////////Creating gameboard//////////
-
 bool tile_contains_mine(int x,int y, int socket_id){
 	//Check if tile in the x,y positon contains a mine
 
@@ -402,7 +405,6 @@ void place_mines(int socket_id){
 }	
 
 ////////// Load authentication file//////////
-
 node_login_t * node_add_login(node_login_t *head, login_t *login){
 	//Add usernames and passwords to linked list
 
@@ -532,7 +534,6 @@ void print_login_list(node_login_t *head){
 }
 
 ////////// Gameplay elemnts//////////
-
 void reveal_selected_tile(int x,int y, int socket_id){
 	//For the specific square make is reveled the equivelent char.
 
@@ -638,7 +639,6 @@ void place_flags(int x, int y, int socket_id){
 	}
 }
 
-
 void restart_game(int socket_id){
 	//Reset variables for the game
 
@@ -661,7 +661,6 @@ void restart_game(int socket_id){
 }
 
 ////////// Server & Client connection//////////
-
 bool client_play(int socket_id){
 	//Game loop
 
@@ -795,20 +794,11 @@ void client_login(int client_socket){
 	}
 }
 
-void handle_request(struct request* a_request, int thread_id){
-    if (a_request) {
-        printf("Thread '%d' handled request '%d'\n",
-               thread_id, a_request->number);
-        client_login(a_request->client_socket);
-        fflush(stdout);
-    }
-}
-
-////////// exit catch/////////
-void exit_catch(int Signal){
-	//If ctrl+c is pressed clsoe the socket.
-	//send()
-	close(server_socket);
+//////////exit catch/////////
+void exit_catch( int sig ){
+	if(signal(sig, SIG_IGN)){
+		server_running = false;
+	}
 }
 
 int server_setup ( int request_count ){
@@ -877,12 +867,13 @@ int server_setup ( int request_count ){
 }
 
 int main ( int argc, char *argv[] ){	
-	//If specified portm use that instead of the defualt.
+	// IF specified PORT inputed by user use that instead of the default.
 	if(argc >= 2){
 		MYPORT = htons(atoi(argv[1]));
 	}
-	int thread_ID[NUM_THREADS], request_count = 0; // Thread ID array size of BACKLOG
-	pthread_t thread_data_ID[NUM_THREADS];	// Thread ID array for pthread data type size of BACKLOG
+
+	int thread_ID[NUM_THREADS], request_count = 0; // Thread ID array size of NUM_THREADS
+	pthread_t thread_data_ID[NUM_THREADS];	// Thread ID array for pthread data type size of NUM_THREADS
 	srand(RANDOM_NUMBER_SEED);	//See random number generator
 
 	//Set up the leaderboard
@@ -892,23 +883,26 @@ int main ( int argc, char *argv[] ){
 	head_login = load_auth();
 	printf("\nServer started.\n");
 	printf("\nUsernames in linked lists from text file.\n");
+	
+	// Check if server is closed with control - C
+	signal(SIGINT, exit_catch);
 
-	while(1){
+	while(server_running){
 		// Create Pthread pool of 10 (size of NUM_THREADS)
 		for (int i = 0; i < NUM_THREADS; i++){
 			thread_ID[i] = i;
 			pthread_create(&thread_data_ID[i], NULL, p_thread_create, (void*) &thread_ID[i]);
 		}
+		// Listen and bind client sockets in server_setup - 
+		// This also begins the game for the user running it in a thread.
 		server_setup(request_count);
 	}
-
+	
 	// Re-join Threads
 	for (int i = 0; i < NUM_THREADS; i++){
 		pthread_join(thread_data_ID[i], NULL);
 	}
 
-	printf("\n");
-	
 
 	return 0;
 }
