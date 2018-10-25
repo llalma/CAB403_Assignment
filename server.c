@@ -1,5 +1,5 @@
 // Server Client
-
+#define _GNU_SOURCE
 #include <arpa/inet.h>
 #include <stdio.h> 
 #include <stdlib.h> 
@@ -14,8 +14,9 @@
 #include <time.h>
 #include <pthread.h>
 #include <ctype.h>
+#include <signal.h> 
 
-#define _GNU_SOURCE
+
 #define RANDOM_NUMBER_SEED 42 // Seed for randomisation
 #define NUM_THREADS 10     // how many pending connections queue will hold
 #define MAXDATASIZE 1000 
@@ -101,7 +102,7 @@ node_login_t *head_login;
 //char * UserName; // 
 node_leaderboard_t *head_leaderboard;
 int server_socket; // Server socket global
-static bool server_running = true; // Server running state
+bool server_running; // Server running state
 int MYPORT = 12345;    // The default port if no port is specified
 
 // Global void pointer for pthreads
@@ -109,7 +110,7 @@ void *server_handle;
 int num_requests = 0; // Number of requests
 
 
-// Define required functions to avoid  ordering errors.
+// Define required functions to avoid ordering errors.
 void client_login();
 void handle_request();
 
@@ -595,7 +596,6 @@ int user_input(int x, int y, int socket_id){
 	y--;
 
 	//Reveal the selected tile
-	//gamestate.tiles[x][y].revealed = true;
 	reveal_selected_tile(x,y, socket_id);
 
 	if(gamestate[socket_id].tiles[x][y].is_mine == true){
@@ -795,12 +795,7 @@ void client_login(int client_socket){
 	}
 }
 
-//////////exit catch/////////
-void exit_catch( int sig ){
-	if(signal(sig, SIG_IGN)){
-		server_running = false;
-	}
-}
+
 
 int server_setup ( int request_count ){
 	//Setup the server
@@ -810,9 +805,6 @@ int server_setup ( int request_count ){
 	socklen_t sin_size;
 
 	server_socket = socket(AF_INET, SOCK_STREAM, 0); // AF_INET = Internet Protocol v4 Addresses (Family), SOCK_STREAM = TCP, 0 = protocol default
-
-	//Signal catch for ctrl+c
-	signal(SIGINT, exit_catch);
 
 	// Start/define network services
 	printf("Server starts networking services.\n");
@@ -862,10 +854,25 @@ int server_setup ( int request_count ){
 	client_login(client_socket);
 
 	//Close socket connection
-	printf("\nSocket to client closed");	///////////////// Include client number
+	printf("\nSocket to client closed");
 	close(client_socket);
 	exit(0);
 }
+
+//////////exit catch/////////
+/* void ctrl_C_handler(int sig_num) { 
+    signal(SIGINT, ctrl_C_handler); 
+	server_running = false;
+    fflush(stdout); 
+} */ 
+
+
+void ctrl_C_handler(int sig_num) { 
+    signal(SIGINT, ctrl_C_handler);
+    printf("\n Client cannot be terminated using Ctrl+C! \n"); 
+	server_running = false;
+    fflush(stdout); 
+	} 
 
 ////////// Main //////////
 int main ( int argc, char *argv[] ){	
@@ -877,7 +884,8 @@ int main ( int argc, char *argv[] ){
 	int thread_ID[NUM_THREADS], request_count = 0; // Thread ID array size of NUM_THREADS
 	pthread_t thread_data_ID[NUM_THREADS];	// Thread ID array for pthread data type size of NUM_THREADS
 	srand(RANDOM_NUMBER_SEED);	//See random number generator
-
+	server_running = true;
+	
 	//Set up the leaderboard
 	leaderboard_setup();
 
@@ -886,10 +894,11 @@ int main ( int argc, char *argv[] ){
 	printf("\nServer started.\n");
 	printf("\nUsernames in linked lists from text file.\n");
 	
-	// Check if server is closed with control - C
-	signal(SIGINT, exit_catch);
+	// Check if server is closed with Ctrl+C
+	signal(SIGINT, ctrl_C_handler);
 
-	while(server_running){
+	while(server_running = true){
+
 		// Create Pthread pool of 10 (size of NUM_THREADS)
 		for (int i = 0; i < NUM_THREADS; i++){
 			thread_ID[i] = i;
@@ -899,12 +908,13 @@ int main ( int argc, char *argv[] ){
 		// This also begins the game for the user running it in a thread.
 		server_setup(request_count);
 	}
-	
+
+	// Clean up //
 	// Re-join Threads
 	for (int i = 0; i < NUM_THREADS; i++){
 		pthread_join(thread_data_ID[i], NULL);
 	}
 
-
+	close(server_socket);
 	return 0;
 }

@@ -9,6 +9,7 @@
 #include <unistd.h>
 #include <ctype.h>
 #include <stdbool.h>
+#include <signal.h> 
 
 #define MAXDATASIZE 100 /* max number of bytes we can get at once */
 #define ARRAY_SIZE 150
@@ -441,14 +442,19 @@ int server_connect ( void ){
 	close(server_socket);
 }
 
-int main(int argc, char *argv[]) {
 
-	//If specified portm use that instead of the defualt.
+void ctrl_C_handler(int sig_num) { 
+    signal(SIGINT, ctrl_C_handler); 
+    printf("\n Client annot be terminated using Ctrl+C! \n"); 
+    fflush(stdout); 
+	} 
+
+int main(int argc, char *argv[]) {
+	signal(SIGINT, ctrl_C_handler); 
+	// IF specified PORT inputed by user use that instead of the default.
 	if(argc >= 2){
 		PORTNUMBER = htons(atoi(argv[1]));
 	}
-
-
 	//Connect to the server.
 	server_connect();
 
