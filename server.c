@@ -29,10 +29,10 @@
 //Define max transmit sizes
 #define MAXLOGINDATA 100
 
-pthread_mutex_t request_mutex = PTHREAD_RECURSIVE_MUTEX_INITIALIZER_NP;
-
-/* global condition variable for our program. assignment initializes it. */
-pthread_cond_t  got_request   = PTHREAD_COND_INITIALIZER;
+//////////Globals for pthreads//////////
+pthread_mutex_t request_mutex = PTHREAD_RECURSIVE_MUTEX_INITIALIZER_NP; // Initilses the use of request_mutex for locking
+pthread_cond_t  got_request   = PTHREAD_COND_INITIALIZER; // initilises the got_request condition
+pthread_t thread_data_ID[NUM_THREADS];	// Thread ID array for pthread data type size of NUM_THREADS
 
 //////////Structures//////////
 // Define log in structure
@@ -106,11 +106,9 @@ volatile bool server_running = true; // Server running state
 int MYPORT = 12345;    // The default port if no port is specified
 int port_ID_pos;
 
-
 // Global void pointer for pthreads
 void *server_handle;
 int num_requests = 0; // Number of requests
-
 
 // Define required functions to avoid ordering errors.
 void client_login();
@@ -854,23 +852,26 @@ int server_setup ( int request_count){
 
 //////////exit catch/////////
 void ctrl_C_handler(int sig_num) { 
-    signal(SIGINT, ctrl_C_handler);
+    //signal(SIGINT, ctrl_C_handler);
     printf("\n Server terminated! \n"); 
 	server_running = false;
+	for (int i = 0; i < NUM_THREADS; i++){
+		pthread_cancel(thread_data_ID[i]);
+	}
 	close(server_socket);
-	kill(0,3);
+	exit(0);
 	} 
 
 ////////// Main //////////
 int main ( int argc, char *argv[] ){	
+	
 	// IF specified PORT inputed by user use that instead of the default.
 	if(argc >= 2){
 		MYPORT = htons(atoi(argv[1]));
 	}
 	int thread_ID[NUM_THREADS], request_count = 0; // Thread ID array size of NUM_THREADS
 	srand(RANDOM_NUMBER_SEED);	//See random number generator
-	pthread_t thread_data_ID[NUM_THREADS];	// Thread ID array for pthread data type size of NUM_THREADS
-	
+
 	//Place all usernames and passwords in a linked list, loads from text file
 	head_login = load_auth();
 	printf("\nServer started.\n");
