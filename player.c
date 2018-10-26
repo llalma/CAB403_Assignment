@@ -16,7 +16,7 @@
 
 #define NUM_TILES_X 9
 #define NUM_TILES_Y 9
-#define NUM_MINES 10
+#define NUM_MINES 1
 
 typedef struct{
 	char tiles[NUM_TILES_X][NUM_TILES_Y];
@@ -441,7 +441,7 @@ int server_connect ( void ){
 	close(server_socket);
 }
 
-
+// ctrl c catch 
 void ctrl_C_handler(int sig_num) { 
     signal(SIGINT, ctrl_C_handler); 
     printf("\n Client annot be terminated using Ctrl+C! \n"); 

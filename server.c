@@ -82,7 +82,7 @@ typedef struct{
 	char *username;
 	int won;
 	int played;
-} GameState[20];  // Create GameState structure array size of 14
+} GameState[20];  // Create GameState structure array size of 20
 
 
 // Data Structure for thread queue
@@ -102,9 +102,10 @@ node_login_t *head_login;
 //char * UserName; // 
 node_leaderboard_t *head_leaderboard;
 int server_socket; // Server socket global
-bool server_running; // Server running state
+volatile bool server_running = true; // Server running state
 int MYPORT = 12345;    // The default port if no port is specified
 int port_ID_pos;
+
 
 // Global void pointer for pthreads
 void *server_handle;
@@ -118,7 +119,6 @@ void handle_request();
 //////////Send data to client//////////
 void Send_Array_Data(int socket_id, char *text) {
 	//Send data to the client
-
 	uint16_t statistics;  
 	for (int i = 0; i < 150; i++) {
 		statistics = htons(text[i]);
@@ -138,7 +138,7 @@ void Send_Board(int socket_id) {
 	}
 }
 
-//////////Thread Pooling and Request management////////
+//////////Thread Pooling + Request management + GamePlay setup////////
 void add_request(int request_num, pthread_mutex_t* p_mutex, pthread_cond_t* p_cond_var, int client_socket){
 	int return_code; // Return code from pthread function
 	struct request* a_request; // Pointer to newly added request
@@ -234,13 +234,13 @@ void* p_thread_create(void* arg) {
 }
 
 void handle_request(struct request* a_request, int thread_id){
-    if (a_request) {
+    if (a_request) { // If there is a request to log in.
         printf("Thread '%d' handled request '%d'\n",
-               thread_id, a_request->number);
-		if (port_ID_pos == 0){
+               thread_id, a_request->number); // Printing the thread ID and request number
+		if (port_ID_pos == 0){ // Assisting with positioning the data in the order in the Gamestate struc array.
 			port_ID_pos = a_request->client_socket;
 		}
-        client_login(a_request->client_socket);
+        client_login(a_request->client_socket); // Run the login in screen and if passed, the game will procced.
         fflush(stdout);
     }	
 }
@@ -278,6 +278,7 @@ void node_add_leaderboard(node_leaderboard_t *head, player_t *player){
 
 	//Point head to new node just created.
 	head->next = new_addition;
+
 }
 
 void leaderboard_sort(node_leaderboard_t *head, player_t *player_new){
@@ -334,7 +335,7 @@ void print_leaderboard(node_leaderboard_t *head,int socket_id){
 	//While there is a row in the keaderboard which is no filler data send it, row by row.
 	while(head != NULL & head->player->won != -1){
 		char row[50];
-		snprintf(row,sizeof(row),"\n%s\t %ld\t %d\t %d", head->player->username,head->player->playtime,head->player->won,head->player->played);
+		snprintf(row,sizeof(row),"\n%s\t\t\t %ld\t %d\t\t %d", head->player->username,head->player->playtime,head->player->won,head->player->played);
 
 		Send_Array_Data(socket_id,row);
 		head = head->next;
@@ -345,7 +346,8 @@ void print_leaderboard(node_leaderboard_t *head,int socket_id){
 }
 
 
-void leaderboard_setup(int request_count, int client_socket){
+void leaderboard_setup(){
+	pthread_mutex_lock(&request_mutex); // Lock mutex for thread exclusive access of data
 	//Blank leaderboard initially
 	head_leaderboard = NULL;
 	//Filler data for 1st and last node
@@ -358,6 +360,7 @@ void leaderboard_setup(int request_count, int client_socket){
 	//Add two bits of filler data in leaderboard
 	head_leaderboard = fill_leaderboard(head_leaderboard,player_new);
 	head_leaderboard = fill_leaderboard(head_leaderboard,player_new);
+	pthread_mutex_unlock(&request_mutex); // UnLock mutex 
 }
 
 //////////Creating gameboard//////////
@@ -375,10 +378,12 @@ void place_mines(int socket_id){
 
 	for(int i = 0;i<NUM_MINES;i++){
 		int x,y;
+
 		do{
 			x = rand() % NUM_TILES_X;
 			y = rand() % NUM_TILES_Y;
 		}while(tile_contains_mine(x,y, socket_id));
+
 
 		//For surrounding tiles increase adjacent mines by 1
 		//Do this first so the adjacent tiles for the mine square can be replaced with -1
@@ -393,7 +398,6 @@ void place_mines(int socket_id){
 				}				
 			}
 		}
-
 		//Change specific tile to a mine
 		gamestate[socket_id-port_ID_pos].tiles[x][y].is_mine = true;
 		gamestate[socket_id-port_ID_pos].tiles[x][y].adjacent_mines = -1;	//Set to -1, as adjacent mines dosnt make sense here
@@ -646,7 +650,6 @@ void restart_game(int socket_id){
 
 	//Placing mines
 	place_mines(socket_id);
-
 	gamestate[socket_id-port_ID_pos].game_won = NULL;
 	gamestate[socket_id-port_ID_pos].gameover = 1;
 	gamestate[socket_id-port_ID_pos].remaing_mines = NUM_MINES;
@@ -713,6 +716,8 @@ bool client_play(int socket_id){
 	}
 
 	if(gamestate[socket_id-port_ID_pos].game_won == true){
+		pthread_mutex_lock(&request_mutex); // Lock mutex for thread exclusive access of data
+
 		//Acutal player to add
 		player_t *player_new2 = (player_t*)malloc(sizeof(player_t));
 		//Populate new player with data
@@ -721,6 +726,7 @@ bool client_play(int socket_id){
 		player_new2->won = gamestate[socket_id-port_ID_pos].won;
 		player_new2->played = gamestate[socket_id-port_ID_pos].played;
 		leaderboard_sort(head_leaderboard,player_new2);
+		pthread_mutex_unlock(&request_mutex);// Unlock mutex
 		
 	}
 	if(toupper(input[0]) != 'Q'){
@@ -739,14 +745,10 @@ void client_login(int client_socket){
 	//Recieve users username input
 	recv(client_socket, username, MAXLOGINDATA, 0);
 
-	//Send password login message
+	//Send password login message				pthread_kill(thread_data_ID)
 	Send_Array_Data(client_socket,"Password: ");
 	//Recieve users password input
 	recv(client_socket, password, MAXLOGINDATA, 0);
-
-	for ( int i = 0; i < 14; i++){
-		printf("\n%s", gamestate[i].username);
-	}
 
 	//Check login information
 	if(check_login(username,password, client_socket) == 2){
@@ -791,9 +793,8 @@ void thread_join( pthread_t *thread_data_ID ){
 	}
 }
 
-int server_setup ( int request_count ){
-	//Setup the server
-	
+int server_setup ( int request_count){
+	// Setup the server
 	int error, exit_check = 0, *newsocket, client_socket;
 	struct sockaddr_in client_addr; /* connector's address information */
 	socklen_t sin_size;
@@ -827,10 +828,9 @@ int server_setup ( int request_count ){
 		}
 	}while(error == -1);
 
-	// Start listening for connections
-	listen(server_socket, NUM_THREADS);
-	printf("\nServer is waiting for log in request...\n");
-
+		// Start listening for connections
+		listen(server_socket, NUM_THREADS);
+		printf("\nServer is waiting for log in request...\n");
 
 	// Client connection // NULL and NULL would be filed with STRUC if you want to know where the client is connecting from etc
 	while ((client_socket = accept(server_socket, (struct sockaddr *)&client_addr, &sin_size))){
@@ -855,9 +855,10 @@ int server_setup ( int request_count ){
 //////////exit catch/////////
 void ctrl_C_handler(int sig_num) { 
     signal(SIGINT, ctrl_C_handler);
-    printf("\n Client cannot be terminated using Ctrl+C! \n"); 
+    printf("\n Server terminated! \n"); 
 	server_running = false;
-    fflush(stdout); 
+	close(server_socket);
+	kill(0,3);
 	} 
 
 ////////// Main //////////
@@ -866,22 +867,20 @@ int main ( int argc, char *argv[] ){
 	if(argc >= 2){
 		MYPORT = htons(atoi(argv[1]));
 	}
-
 	int thread_ID[NUM_THREADS], request_count = 0; // Thread ID array size of NUM_THREADS
-	pthread_t thread_data_ID[NUM_THREADS];	// Thread ID array for pthread data type size of NUM_THREADS
 	srand(RANDOM_NUMBER_SEED);	//See random number generator
-	server_running = true;
+	pthread_t thread_data_ID[NUM_THREADS];	// Thread ID array for pthread data type size of NUM_THREADS
 	
-
-
 	//Place all usernames and passwords in a linked list, loads from text file
 	head_login = load_auth();
 	printf("\nServer started.\n");
 	printf("\nUsernames in linked lists from text file.\n");
-	
+
+	// Setup leaderboard for first time
+	leaderboard_setup();
+
 	// Check if server is closed with Ctrl+C
 	signal(SIGINT, ctrl_C_handler);
-
 	while(server_running = true){
 
 		// Create Pthread pool of 10 (size of NUM_THREADS)
@@ -898,5 +897,5 @@ int main ( int argc, char *argv[] ){
 	// Re-join Threads
 	thread_join(thread_data_ID);
 	close(server_socket);
-	return 0;
+
 }
