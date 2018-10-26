@@ -16,7 +16,7 @@
 
 #define NUM_TILES_X 9
 #define NUM_TILES_Y 9
-#define NUM_MINES 1
+#define NUM_MINES 10
 
 typedef struct{
 	char tiles[NUM_TILES_X][NUM_TILES_Y];
@@ -227,11 +227,6 @@ void leaderboard(int server_socket){
 			printf("\n%s",pch);
 			pch = strtok(NULL,"\t");
 		}
-
-		//printf("\n%s",strtok(results,"\t"));
-
-		//printf("\n%s",results);
-
 		results = Receive_Array_Int_Data(server_socket,ARRAY_SIZE);
 	}
 }
@@ -366,9 +361,7 @@ int play_game(int server_socket, bool login){
 
 				//Print out the array
 				printf("\n%s\n",results);
-
 				close(server_socket);
-			
 				free(results);
 
 				return 1;

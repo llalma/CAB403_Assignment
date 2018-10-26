@@ -24,7 +24,7 @@
 // Defining size of play area
 #define NUM_TILES_X 9
 #define NUM_TILES_Y 9
-#define NUM_MINES 1
+#define NUM_MINES 10
 
 //Define max transmit sizes
 #define MAXLOGINDATA 100
@@ -864,7 +864,7 @@ void ctrl_C_handler(int sig_num) {
 
 ////////// Main //////////
 int main ( int argc, char *argv[] ){	
-	
+
 	// IF specified PORT inputed by user use that instead of the default.
 	if(argc >= 2){
 		MYPORT = htons(atoi(argv[1]));
